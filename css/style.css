@@ -185,3 +185,26 @@ input[type=text]:focus { outline: none; border-color: var(--primary); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- เฟส 2: หน้าต้อนรับ รหัสบ้าน สมาชิก ป้ายแจ้ง ---------- */
+.welcome { position: fixed; inset: 0; z-index: 80; background: var(--bg); display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; }
+.welcome-box { width: 100%; max-width: 380px; text-align: center; }
+.welcome-logo { font-size: 64px; line-height: 1.1; }
+.welcome-box h1 { margin: 0 0 10px; color: var(--primary-dark); font-size: 30px; }
+.welcome-box p { margin: 10px 0; }
+.btn.big { min-height: 56px; font-size: 18px; }
+.btn.alt { background: #fff; color: var(--primary-dark); border: 2px solid var(--primary); box-shadow: 0 3px 0 var(--line); }
+.link { min-height: 44px; margin-top: 8px; color: var(--muted); text-decoration: underline; }
+.w-error { color: #B5483A; font-weight: 600; }
+.role-list { display: grid; gap: 10px; margin: 12px 0; }
+.role-btn { display: flex; align-items: center; justify-content: center; gap: 12px; text-align: left; min-height: 64px; }
+.role-btn small { display: block; color: rgba(255, 255, 255, .85); font-weight: 400; }
+.role-btn.taken { background: #D9CCC0; box-shadow: none; color: #8F7260; }
+.role-btn.taken small { color: #8F7260; }
+.role-emoji { font-size: 32px; }
+.code-input { width: 100%; min-height: 60px; margin: 6px 0 4px; text-align: center; letter-spacing: .3em; font-size: 28px; font-weight: 700; text-transform: uppercase; border-radius: 16px; border: 2px solid var(--line); background: #fff; }
+.code-input:focus { outline: none; border-color: var(--primary); }
+.house-code { font-size: 38px; font-weight: 700; letter-spacing: .25em; color: var(--primary-dark); margin: 8px 0; padding-left: .25em; }
+.house-card { text-align: center; }
+.btn-small { flex: none; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--soft); color: var(--primary-dark); font-weight: 600; font-size: 14px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 90; max-width: 90%; background: #4A2C1D; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.3); }

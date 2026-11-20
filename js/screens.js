@@ -20,7 +20,7 @@
     let h = '';
 
     // แถบดาว + ชื่อขั้นของต้นไม้
-    const have = v.treeProgress % 2;
+    const have = v.treeStars % 2;
     h += '<div class="card stars-card">' +
       '<div class="stars-row"><span class="big-star">⭐</span><span class="stars-num">' + v.stars + '</span><span class="stars-label">ดาวสะสม</span></div>' +
       '<div class="stage-name">ต้นไม้ของเรา: <b>' + esc(v.stageName) + '</b></div>';
@@ -41,6 +41,9 @@
 
     // ภารกิจวันนี้
     h += '<h2>ภารกิจวันนี้</h2><div class="list">';
+    if (!v.todayMissions.length) {
+      h += '<div class="card muted center">ยังไม่มีภารกิจวันนี้<br>(พ่อ/แม่เปิดใช้ภารกิจได้ในหน้า "พ่อแม่")</div>';
+    }
     v.todayMissions.forEach(function (m) {
       const all = Store.ROLE_IDS.every(function (r) { return m.done[r]; });
       const mine = !!m.done[v.me];
@@ -110,6 +113,23 @@
   function parentsNote(v) {
     return v.me === 'kid' ? '<div class="card note">👀 ลูกดูหน้านี้ได้อย่างเดียว แก้ไขไม่ได้นะ</div>' : '';
   }
+  function houseCard(v) {
+    return '<div class="card house-card"><div class="label">รหัสบ้าน (ให้คนในครอบครัวใส่ตอนเข้าร่วม)</div>' +
+      '<div class="house-code">' + esc(v.code) + '</div>' +
+      '<button class="btn wide" data-action="copyCode" data-code="' + esc(v.code) + '">คัดลอกรหัส</button></div>';
+  }
+  function memberList(v) {
+    const canRelease = v.me !== 'kid';
+    return Store.ROLE_IDS.map(function (r) {
+      const taken = !!v.roles[r], mine = v.me === r;
+      return '<div class="row-item"><span class="m-icon">' + R[r].emoji + '</span>' +
+        '<span class="m-title">' + (taken ? esc(v.names[r]) : '<span class="muted">ยังว่าง</span>') +
+        '<small>' + R[r].name + (mine ? ' (คุณ)' : '') + '</small></span>' +
+        (canRelease && taken && !mine
+          ? '<button class="btn-small" data-action="releaseRole" data-role="' + r + '" data-name="' + esc(v.names[r]) + '">ปล่อยบทบาท</button>' : '') +
+        '</div>';
+    }).join('');
+  }
   function missionList(v) {
     const ro = v.me === 'kid';
     return v.missions.map(function (m) {
@@ -135,5 +155,5 @@
     }).join('');
   }
 
-  window.Screens = { esc, home, challenge, collect, parentsHead, parentsNote, missionList, rewardList, iconPicker };
+  window.Screens = { esc, home, challenge, collect, parentsHead, parentsNote, houseCard, memberList, missionList, rewardList, iconPicker };
 })();

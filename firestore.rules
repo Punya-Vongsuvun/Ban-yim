@@ -1,0 +1,112 @@
+rules_version = '2';
+
+// บ้านยิ้ม — Security Rules (เฟส 2)
+// families/{รหัสบ้าน}: members { uid: {role, name} } และ roles { dad|mom|kid: uid }
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function famData(f) {
+      return get(/databases/$(database)/documents/families/$(f)).data;
+    }
+    function isMember(f) {
+      return signedIn() && (request.auth.uid in famData(f).members);
+    }
+    function isParent(f) {
+      return isMember(f) && famData(f).members[request.auth.uid].role in ['dad', 'mom'];
+    }
+
+    // เข้าร่วมบ้าน: เพิ่มตัวเองเข้า members/roles ด้วยบทบาทที่ยังว่างเท่านั้น
+    function isJoining(o, d) {
+      let uid = request.auth.uid;
+      let r = d.members[uid].role;
+      return signedIn()
+        && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
+        && !(uid in o.members)
+        && r in ['dad', 'mom', 'kid']
+        && !(r in o.roles)
+        && d.roles[r] == uid
+        && d.roles.diff(o.roles).affectedKeys().hasOnly([r])
+        && d.members.diff(o.members).affectedKeys().hasOnly([uid])
+        && d.members[uid].keys().hasOnly(['role', 'name'])
+        && d.members[uid].name is string
+        && d.members[uid].name.size() <= 20;
+    }
+
+    // พ่อ/แม่ปล่อยบทบาทของคนอื่น (ปล่อยของตัวเองไม่ได้)
+    function releasesRole(o, d, r) {
+      return (r in o.roles)
+        && !(r in d.roles)
+        && o.roles[r] != request.auth.uid
+        && d.roles.diff(o.roles).affectedKeys().hasOnly([r])
+        && !(o.roles[r] in d.members)
+        && d.members.diff(o.members).affectedKeys().hasOnly([o.roles[r]]);
+    }
+    function isReleasing(o, d) {
+      return (request.auth.uid in o.members)
+        && o.members[request.auth.uid].role in ['dad', 'mom']
+        && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
+        && (releasesRole(o, d, 'dad') || releasesRole(o, d, 'mom') || releasesRole(o, d, 'kid'));
+    }
+
+    match /families/{f} {
+      // อ่านเอกสารบ้านเดียวได้ถ้ารู้รหัส (เพื่อเข้าร่วม) แต่ค้นหารายชื่อบ้านไม่ได้
+      allow get: if signedIn();
+      allow list: if false;
+
+      // สร้างบ้าน: ผู้สร้างต้องเป็นพ่อหรือแม่ และเป็นสมาชิกคนแรกคนเดียว
+      allow create: if signedIn()
+        && f.matches('[A-HJ-NP-Z2-9]{6}')
+        && request.resource.data.keys().hasOnly(['name', 'code', 'createdAt', 'members', 'roles',
+             'stars', 'treeStars', 'treeStage', 'treeNumber', 'garden', 'gifts',
+             'streak', 'challengeLen', 'lastCountedDate', 'collection'])
+        && request.resource.data.code == f
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid].role in ['dad', 'mom']
+        && request.resource.data.members[request.auth.uid].keys().hasOnly(['role', 'name'])
+        && request.resource.data.roles.keys().hasOnly([request.resource.data.members[request.auth.uid].role])
+        && request.resource.data.roles[request.resource.data.members[request.auth.uid].role] == request.auth.uid;
+
+      allow update: if
+        // สมาชิกแก้ข้อมูลเกมได้ (ยกเว้น members / roles / code / createdAt)
+        (signedIn() && (request.auth.uid in resource.data.members)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'roles', 'code', 'createdAt']))
+        || isJoining(resource.data, request.resource.data)
+        || isReleasing(resource.data, request.resource.data);
+
+      allow delete: if false;
+
+      // ข้อมูลของแต่ละวัน: สมาชิกอ่าน/แตะภารกิจได้ แต่เปลี่ยนชุดภารกิจของวันไม่ได้
+      match /days/{d} {
+        allow read: if isMember(f);
+        allow create: if isMember(f)
+          && d.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+          && request.resource.data.keys().hasOnly(['missionIds', 'done', 'completed', 'counted'])
+          && request.resource.data.missionIds.size() <= 3;
+        allow update: if isMember(f)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', 'completed', 'counted']);
+        allow delete: if false;
+      }
+
+      // ชุดภารกิจและรางวัลจริง: ทุกคนอ่านได้ แต่ พ่อ/แม่ เท่านั้นที่แก้ได้ (ลูกแก้ไม่ได้)
+      match /missions/{m} {
+        allow read: if isMember(f);
+        allow write: if isParent(f);
+      }
+      match /rewards/{r} {
+        allow read: if isMember(f);
+        allow write: if isParent(f);
+      }
+
+      // บันทึกการเปิดกล่องของขวัญ: เพิ่มได้อย่างเดียว
+      match /giftLog/{g} {
+        allow read: if isMember(f);
+        allow create: if isMember(f);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

@@ -5,17 +5,29 @@
   const A = Store.act;
   let pickedIcon = '🧸';
   let modalBusy = false;
+  let toastTimer = null;
+
+  function toast(text) {
+    const t = $('#toast');
+    t.textContent = text; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 2800);
+  }
 
   function render() {
+    const st = Store.status();
+    if (st !== 'ready') { Welcome.show(st); return; }
+    Welcome.hide();
     const v = Store.view();
-    const me = Store.ROLES[v.me];
-    $('#whoChip').innerHTML = me.emoji + ' ' + Screens.esc(v.names[v.me] || me.name);
+    $('#whoChip').innerHTML = Store.ROLES[v.me].emoji + ' ' + Screens.esc(v.names[v.me]);
     Scene.update(v);
     $('#homeBody').innerHTML = Screens.home(v);
     $('#screen-challenge').innerHTML = Screens.challenge(v);
     $('#screen-collect').innerHTML = Screens.collect(v);
     $('#parentsHead').innerHTML = Screens.parentsHead(v);
     $('#parentsNote').innerHTML = Screens.parentsNote(v);
+    $('#houseCard').innerHTML = Screens.houseCard(v);
+    $('#memberList').innerHTML = Screens.memberList(v);
     $('#missionList').innerHTML = Screens.missionList(v);
     $('#rewardList').innerHTML = Screens.rewardList(v);
     $('#iconPicker').innerHTML = Screens.iconPicker(pickedIcon);
@@ -37,15 +49,17 @@
   }
 
   /* ---------- กล่องของขวัญ ---------- */
-  function openGift() {
+  async function openGift() {
     if (modalBusy) return;
-    const res = A.openGift();
-    if (!res) return;
     modalBusy = true;
     const m = $('#modal');
     m.hidden = false;
     m.innerHTML = '<div class="modal-box"><div class="shake">🎁</div><p>กำลังเปิดกล่อง...</p></div>';
+    const started = Date.now();
+    const res = await A.openGift();
+    const wait = Math.max(0, 1100 - (Date.now() - started));
     setTimeout(function () {
+      if (!res) { closeModal(); return; }
       let body;
       if (res.type === 'animal') {
         const a = Store.animal(res.id);
@@ -57,7 +71,7 @@
         body = '<div class="reveal-art big">🎉</div><h3>ได้รางวัลจริง!</h3><p class="prize">' + Screens.esc(res.title) + '</p>';
       }
       m.innerHTML = '<div class="modal-box reveal">' + body + '<button class="btn wide" data-action="closeModal">เยี่ยมเลย</button></div>';
-    }, 1100);
+    }, wait);
   }
   function closeModal() {
     const m = $('#modal');
@@ -73,18 +87,20 @@
     const el = $('#rewardTitle');
     if (A.addReward(el.value)) el.value = '';
   }
+  function copyCode(code) {
+    const done = function () { toast('คัดลอกรหัสแล้ว'); };
+    try { navigator.clipboard.writeText(code).then(done, function () { toast('รหัสบ้านคือ ' + code); }); }
+    catch (e) { toast('รหัสบ้านคือ ' + code); }
+  }
 
-  /* ---------- DEV: ปุ่มทดสอบเฟส 1 (เอาออกก่อนใช้งานจริง) ---------- */
+  /* ---------- DEV: ปุ่มทดสอบ (เอาออกหลังเฟส 3) ---------- */
   let devOpen = false;
   function renderDev(v) {
     const p = $('#devPanel');
     p.hidden = !devOpen;
     if (!devOpen) return;
-    const roles = Store.ROLE_IDS.map(function (r) {
-      return '<button class="dv' + (v.me === r ? ' on' : '') + '" data-action="devRole" data-role="' + r + '">' + Store.ROLES[r].emoji + ' ' + Store.ROLES[r].name + '</button>';
-    }).join('');
-    p.innerHTML = '<div class="dev-title">🛠 ปุ่มทดสอบ (เฉพาะเฟส 1)</div>' +
-      '<div class="dev-row">เป็นใคร: ' + roles + '</div>' +
+    p.innerHTML = '<div class="dev-title">🛠 ปุ่มทดสอบ (เอาออกหลังเฟส 3)</div>' +
+      '<div class="dev-row">เครื่องนี้คือ: ' + Store.ROLES[v.me].emoji + ' ' + Screens.esc(v.names[v.me]) + '</div>' +
       '<div class="dev-row">' +
       '<button class="dv" data-action="devStar">+1 ดาว</button>' +
       '<button class="dv" data-action="devGift">+1 กล่องของขวัญ</button>' +
@@ -92,7 +108,8 @@
       '<button class="dv" data-action="devAllDone">ภารกิจครบ 3 คน</button>' +
       '<button class="dv" data-action="devStreak">+1 วันท้าทาย</button>' +
       '<button class="dv" data-action="devBreak">ขาดวัน (เริ่มใหม่)</button>' +
-      '<button class="dv danger" data-action="devReset">ล้างข้อมูลทดสอบ</button></div>';
+      '<button class="dv danger" data-action="devReset">ล้างดาว/ต้นไม้/สัตว์</button>' +
+      '<button class="dv danger" data-action="devLeave">ออกจากบ้านในเครื่องนี้</button></div>';
   }
 
   /* ---------- การแตะทั้งหมด ---------- */
@@ -100,10 +117,10 @@
     const el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
     const d = el.dataset;
-    const me = Store.view().me;
+    if (d.action.charAt(0) === 'w') { Welcome.handle(d.action, el); return; }
     switch (d.action) {
       case 'tab': showTab(d.tab); break;
-      case 'toggleDone': A.toggleDone(d.id, me); break;
+      case 'toggleDone': A.toggleDone(d.id); break;
       case 'setLen': A.setLen(Number(d.len)); break;
       case 'openGift': openGift(); break;
       case 'closeModal': closeModal(); break;
@@ -113,15 +130,19 @@
       case 'addMission': addMission(); break;
       case 'addReward': addReward(); break;
       case 'delReward': A.removeReward(d.id); break;
+      case 'copyCode': copyCode(d.code); break;
+      case 'releaseRole':
+        if (window.confirm('ปล่อยบทบาทของ ' + d.name + ' ใช่ไหม? (เครื่องของ ' + d.name + ' จะต้องเข้าบ้านใหม่)')) A.releaseRole(d.role);
+        break;
       case 'devToggle': devOpen = !devOpen; render(); break;
-      case 'devRole': A.setRole(d.role); break;
       case 'devStar': A.devStar(); break;
       case 'devGift': A.devGift(); break;
       case 'devAllAnimals': A.devAllAnimals(); break;
       case 'devAllDone': A.devAllDone(); break;
       case 'devStreak': A.devStreak(); break;
       case 'devBreak': A.devBreak(); break;
-      case 'devReset': if (window.confirm('ล้างข้อมูลทดสอบทั้งหมด?')) A.devReset(); break;
+      case 'devReset': if (window.confirm('ล้างดาว ต้นไม้ สัตว์ และกล่องของขวัญของบ้านนี้?')) A.devReset(); break;
+      case 'devLeave': if (window.confirm('ออกจากบ้านในเครื่องนี้? (บทบาทยังถูกจองไว้ จนกว่าพ่อ/แม่จะปล่อย)')) { devOpen = false; A.devLeave(); } break;
     }
   });
   document.addEventListener('keydown', function (e) {
@@ -131,6 +152,7 @@
   });
 
   Store.subscribe(render);
+  Store.onError(toast);
   Scene.mount($('#scene'));
   render();
 })();

@@ -36,6 +36,10 @@
     <section id="screen-parents" class="screen">
       <div id="parentsHead" class="hello"></div>
       <div id="parentsNote"></div>
+      <div id="houseCard"></div>
+
+      <h2>สมาชิกในบ้าน</h2>
+      <div id="memberList" class="list"></div>
 
       <h2>ชุดภารกิจ</h2>
       <div id="missionList" class="list"></div>
@@ -69,15 +73,26 @@
 </div>
 
 <div id="modal" class="modal" hidden></div>
+<div id="welcome" class="welcome"></div>
+<div id="toast" class="toast" hidden role="status"></div>
+<div id="bootError" class="welcome" hidden><div class="welcome-box"><div class="welcome-logo">🏡</div><h1>บ้านยิ้ม</h1>
+  <p class="w-error">โหลดแอปไม่สำเร็จ ต้องมีอินเทอร์เน็ตตอนเปิดครั้งแรก</p>
+  <button class="btn wide" onclick="location.reload()">ลองใหม่</button></div></div>
 
 <!-- ===== DEV: ปุ่มทดสอบเฟส 1 (จะเอาออกก่อนใช้งานจริง) ===== -->
 <button id="devToggle" class="dev-toggle" data-action="devToggle" aria-label="เปิดปุ่มทดสอบ">🛠</button>
 <div id="devPanel" class="dev-panel" hidden></div>
 
-<script src="js/mock-data.js"></script>
-<script src="js/animals.js"></script>
-<script src="js/scene.js"></script>
-<script src="js/screens.js"></script>
-<script src="js/app.js"></script>
+<!-- ลำดับสำคัญ: store (โมดูล) ต้องมาก่อนสคริปต์อื่น (defer ทำงานตามลำดับ) -->
+<script type="module" src="js/store-firebase.js"></script>
+<script defer src="js/animals.js"></script>
+<script defer src="js/scene.js"></script>
+<script defer src="js/screens.js"></script>
+<script defer src="js/welcome.js"></script>
+<script defer src="js/app.js"></script>
+<script>
+  // ถ้าโหลด Firebase ไม่ได้ (เช่น ออฟไลน์ตอนเปิดครั้งแรก) ให้แจ้งแทนหน้าว่าง
+  setTimeout(function () { if (!window.Store) document.getElementById('bootError').hidden = false; }, 6000);
+</script>
 </body>
 </html>
