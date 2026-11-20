@@ -47,6 +47,11 @@ function bangkokDate() {
     timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
 }
+function prevDate(d) {
+  const t = new Date(d + 'T00:00:00Z');
+  t.setUTCDate(t.getUTCDate() - 1);
+  return t.toISOString().slice(0, 10);
+}
 function hashStr(s) {
   let h = 1779033703 ^ s.length;
   for (let i = 0; i < s.length; i++) {
@@ -246,7 +251,7 @@ function view() {
     treeNumber: f.treeNumber || 1,
     garden: f.garden || [],
     gifts: f.gifts || 0,
-    streak: f.streak || 0,
+    streak: (f.lastCountedDate === S.dayKey || f.lastCountedDate === prevDate(S.dayKey)) ? (f.streak || 0) : 0,
     challengeLen: f.challengeLen || 7,
     collection: f.collection || {},
     missions,
@@ -265,11 +270,54 @@ const myRole = () => S.family.members[myUid()].role;
 const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const parentOnly = () => myRole() === 'dad' || myRole() === 'mom';
 
+/* ---------- กติกานับดาว (คืนค่าฟิลด์ของบ้านที่ต้องอัปเดต) ---------- */
+// ภารกิจครบ 3 คน 1 ข้อ = 1 ดาว | 2 ดาว = ต้นไม้โต 1 ขั้น | ทุก 3 ดาว = 1 กล่อง
+// ต้นไม้เต็ม (8 ดาว) แล้วได้ดาวถัดไป: ย้ายลงสวนอัตโนมัติ เริ่มต้นใหม่ (ดาวนั้นเป็นของต้นใหม่)
+// วันท้าทาย: นับวันละ 1 ครั้งเมื่อมีภารกิจครบ 3 คนข้อแรก ครบ challengeLen = +2 กล่อง แล้วเริ่มนับใหม่
+function countStar(f, today) {
+  const fu = {};
+  const stars = (f.stars || 0) + 1;
+  let ts = f.treeStars || 0, tn = f.treeNumber || 1, gifts = f.gifts || 0;
+  if (ts >= 8) {
+    fu.garden = (f.garden || []).concat([{ number: tn, date: today }]);
+    tn += 1; ts = 1;
+  } else ts += 1;
+  fu.stars = stars; fu.treeStars = ts; fu.treeNumber = tn;
+  fu.treeStage = Math.min(4, Math.floor(ts / 2));
+  if (stars % 3 === 0) gifts += 1;
+  if (f.lastCountedDate !== today) {
+    const prev = f.lastCountedDate === prevDate(today) ? (f.streak || 0) : 0;
+    const ns = prev + 1;
+    if (ns >= (f.challengeLen || 7)) { fu.streak = 0; gifts += 2; } else fu.streak = ns;
+    fu.lastCountedDate = today;
+  }
+  fu.gifts = gifts;
+  return fu;
+}
+
 /* ---------- การกระทำ ---------- */
 const A = {
+  // ติ๊กภารกิจ + นับดาว/ต้นไม้/กล่อง/ท้าทาย ใน transaction เดียว (กันนับซ้ำเมื่อกดพร้อมกัน)
   toggleDone(missionId) {
-    const cur = !!(S.day && S.day.done && S.day.done[missionId] && S.day.done[missionId][myRole()]);
-    run(updateDoc(dayRef(), { ['done.' + missionId + '.' + myRole()]: !cur }));
+    const role = myRole(), dRef = dayRef(), fRef = famRef(), today = S.dayKey;
+    run(runTransaction(db, async function (tx) {
+      const ds = await tx.get(dRef);
+      const fs = await tx.get(fRef);
+      if (!ds.exists() || !fs.exists()) return;
+      const day = ds.data();
+      if (!(day.missionIds || []).includes(missionId)) return;
+      const done = (day.done && day.done[missionId]) || {};
+      const next = !done[role];
+      const up = { ['done.' + missionId + '.' + role]: next, tick: { m: missionId } };
+      let fu = null;
+      const all3 = ROLE_IDS.every(function (r) { return r === role ? next : !!done[r]; });
+      if (all3 && !(day.counted && day.counted[missionId])) {
+        up['counted.' + missionId] = true;
+        fu = countStar(fs.data(), today);
+      }
+      tx.update(dRef, up);
+      if (fu) tx.update(fRef, fu);
+    }));
   },
   setLen(n) {
     if ([7, 21, 30].includes(n)) run(updateDoc(famRef(), { challengeLen: n }));
@@ -325,50 +373,7 @@ const A = {
       tx.set(doc(collection(db, 'families', famId, 'giftLog')), { result, by: myRole(), at: serverTimestamp() });
       return result;
     }).catch(function (e) { fail(e); return null; });
-  },
-
-  plantTree() {
-    run(runTransaction(db, async function (tx) {
-      const snap = await tx.get(famRef());
-      const f = snap.data();
-      if (Math.min(4, Math.floor((f.treeStars || 0) / 2)) < 4) return;
-      tx.update(famRef(), {
-        garden: (f.garden || []).concat([{ number: f.treeNumber || 1, date: bangkokDate() }]),
-        treeNumber: (f.treeNumber || 1) + 1,
-        treeStars: 0,
-        treeStage: 0
-      });
-    }));
-  },
-
-  /* ----- ปุ่มทดสอบ (เอาออกหลังเฟส 3) ----- */
-  devStar() {
-    run(runTransaction(db, async function (tx) {
-      const f = (await tx.get(famRef())).data();
-      const ts = Math.min(8, (f.treeStars || 0) + 1);
-      tx.update(famRef(), { stars: (f.stars || 0) + 1, treeStars: ts, treeStage: Math.min(4, Math.floor(ts / 2)) });
-    }));
-  },
-  devGift() { run(updateDoc(famRef(), { gifts: increment(1) })); },
-  devAllAnimals() {
-    const up = {};
-    ANIMALS.forEach(function (a) { up['collection.' + a.id] = increment(1); });
-    run(updateDoc(famRef(), up));
-  },
-  devAllDone() {
-    const d = {};
-    ((S.day && S.day.missionIds) || []).forEach(function (id) { d[id] = { dad: true, mom: true, kid: true }; });
-    run(updateDoc(dayRef(), { done: d }));
-  },
-  devStreak() { run(updateDoc(famRef(), { streak: increment(1) })); },
-  devBreak() { run(updateDoc(famRef(), { streak: 0 })); },
-  devReset() {
-    run(updateDoc(famRef(), {
-      stars: 0, treeStars: 0, treeStage: 0, treeNumber: 1, garden: [], gifts: 0,
-      streak: 0, collection: {}, lastCountedDate: null
-    }));
-  },
-  devLeave() { leaveLocal(''); }
+  }
 };
 
 /* ---------- สร้างบ้าน / เข้าร่วม (ใช้จากหน้าต้อนรับ) ---------- */

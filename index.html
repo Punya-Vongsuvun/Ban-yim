@@ -79,10 +79,6 @@
   <p class="w-error">โหลดแอปไม่สำเร็จ ต้องมีอินเทอร์เน็ตตอนเปิดครั้งแรก</p>
   <button class="btn wide" onclick="location.reload()">ลองใหม่</button></div></div>
 
-<!-- ===== DEV: ปุ่มทดสอบเฟส 1 (จะเอาออกก่อนใช้งานจริง) ===== -->
-<button id="devToggle" class="dev-toggle" data-action="devToggle" aria-label="เปิดปุ่มทดสอบ">🛠</button>
-<div id="devPanel" class="dev-panel" hidden></div>
-
 <!-- ลำดับสำคัญ: store (โมดูล) ต้องมาก่อนสคริปต์อื่น (defer ทำงานตามลำดับ) -->
 <script type="module" src="js/store-firebase.js"></script>
 <script defer src="js/animals.js"></script>

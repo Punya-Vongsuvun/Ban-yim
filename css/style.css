@@ -172,15 +172,6 @@ input[type=text]:focus { outline: none; border-color: var(--primary); }
 .rare-big { color: #9A55D0; font-weight: 700; margin: 2px 0; }
 .prize { font-size: 20px; font-weight: 700; color: var(--primary-dark); }
 
-/* ---------- DEV: ปุ่มทดสอบ ---------- */
-.dev-toggle { position: fixed; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 40; width: 48px; height: 48px; border-radius: 50%; background: #4A2C1D; color: #fff; font-size: 22px; opacity: .85; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
-.dev-panel { position: fixed; left: 10px; right: 10px; bottom: calc(142px + env(safe-area-inset-bottom)); z-index: 40; max-width: 460px; margin: 0 auto; background: #4A2C1D; color: #fff; border-radius: 18px; padding: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
-.dev-title { font-weight: 700; margin-bottom: 8px; font-size: 14px; }
-.dev-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 14px; }
-.dv { min-height: 44px; padding: 0 12px; border-radius: 12px; background: #7A5A47; color: #fff; font-size: 14px; }
-.dv.on { background: var(--primary); }
-.dv.danger { background: #B5483A; }
-
 /* ---------- ลดการเคลื่อนไหว ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

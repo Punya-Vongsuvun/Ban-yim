@@ -34,7 +34,6 @@
     const ro = v.me === 'kid';
     $('#missionForm').hidden = ro;
     $('#rewardForm').hidden = ro;
-    renderDev(v);
   }
 
   /* ---------- สลับหน้า ---------- */
@@ -93,25 +92,6 @@
     catch (e) { toast('รหัสบ้านคือ ' + code); }
   }
 
-  /* ---------- DEV: ปุ่มทดสอบ (เอาออกหลังเฟส 3) ---------- */
-  let devOpen = false;
-  function renderDev(v) {
-    const p = $('#devPanel');
-    p.hidden = !devOpen;
-    if (!devOpen) return;
-    p.innerHTML = '<div class="dev-title">🛠 ปุ่มทดสอบ (เอาออกหลังเฟส 3)</div>' +
-      '<div class="dev-row">เครื่องนี้คือ: ' + Store.ROLES[v.me].emoji + ' ' + Screens.esc(v.names[v.me]) + '</div>' +
-      '<div class="dev-row">' +
-      '<button class="dv" data-action="devStar">+1 ดาว</button>' +
-      '<button class="dv" data-action="devGift">+1 กล่องของขวัญ</button>' +
-      '<button class="dv" data-action="devAllAnimals">+สัตว์ทุกชนิด</button>' +
-      '<button class="dv" data-action="devAllDone">ภารกิจครบ 3 คน</button>' +
-      '<button class="dv" data-action="devStreak">+1 วันท้าทาย</button>' +
-      '<button class="dv" data-action="devBreak">ขาดวัน (เริ่มใหม่)</button>' +
-      '<button class="dv danger" data-action="devReset">ล้างดาว/ต้นไม้/สัตว์</button>' +
-      '<button class="dv danger" data-action="devLeave">ออกจากบ้านในเครื่องนี้</button></div>';
-  }
-
   /* ---------- การแตะทั้งหมด ---------- */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-action]');
@@ -124,7 +104,6 @@
       case 'setLen': A.setLen(Number(d.len)); break;
       case 'openGift': openGift(); break;
       case 'closeModal': closeModal(); break;
-      case 'plant': A.plantTree(); break;
       case 'toggleMission': A.toggleMission(d.id); break;
       case 'pickIcon': pickedIcon = d.icon; render(); break;
       case 'addMission': addMission(); break;
@@ -134,15 +113,6 @@
       case 'releaseRole':
         if (window.confirm('ปล่อยบทบาทของ ' + d.name + ' ใช่ไหม? (เครื่องของ ' + d.name + ' จะต้องเข้าบ้านใหม่)')) A.releaseRole(d.role);
         break;
-      case 'devToggle': devOpen = !devOpen; render(); break;
-      case 'devStar': A.devStar(); break;
-      case 'devGift': A.devGift(); break;
-      case 'devAllAnimals': A.devAllAnimals(); break;
-      case 'devAllDone': A.devAllDone(); break;
-      case 'devStreak': A.devStreak(); break;
-      case 'devBreak': A.devBreak(); break;
-      case 'devReset': if (window.confirm('ล้างดาว ต้นไม้ สัตว์ และกล่องของขวัญของบ้านนี้?')) A.devReset(); break;
-      case 'devLeave': if (window.confirm('ออกจากบ้านในเครื่องนี้? (บทบาทยังถูกจองไว้ จนกว่าพ่อ/แม่จะปล่อย)')) { devOpen = false; A.devLeave(); } break;
     }
   });
   document.addEventListener('keydown', function (e) {
