@@ -13,7 +13,7 @@
       '<path d="M0 -2 L0 ' + -k * 1.2 + '" stroke="#5E9E43" stroke-width="1.4" stroke-linecap="round"/></g>';
   }
   function flower(x, y, r) {
-    let s = '<g transform="translate(' + x + ' ' + y + ')">';
+    let s = '<g class="sw fl" transform="translate(' + x + ' ' + y + ')">';
     for (let i = 0; i < 5; i++) {
       const a = i * 72 * Math.PI / 180;
       s += '<circle cx="' + (Math.sin(a) * r).toFixed(1) + '" cy="' + (-Math.cos(a) * r).toFixed(1) +
@@ -26,7 +26,7 @@
   }
   function tuft(x, y, s) {
     s = s || 1;
-    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')" fill="none" stroke="#6FA953" stroke-width="2.4" stroke-linecap="round">' +
+    return '<g class="sw tf" transform="translate(' + x + ' ' + y + ') scale(' + s + ')" fill="none" stroke="#6FA953" stroke-width="2.4" stroke-linecap="round">' +
       '<path d="M0 0 Q-3 -9 -7 -13"/><path d="M0 0 Q0 -11 1 -16"/><path d="M0 0 Q3 -9 8 -12"/></g>';
   }
 
@@ -134,7 +134,7 @@
   }
 
   /* ---------- ควบคุมฉาก ---------- */
-  let svg, sway, inner, layer, clouds, stars = [], curStage = -1, started = false, staticDrawn = false;
+  let svg, sway, inner, layer, clouds, stars = [], swayers = [], curStage = -1, started = false, staticDrawn = false;
   // สัตว์ในฉาก: แสดงพร้อมกันได้ SCENE_MAX ตัว (นับทุกชนิดรวมกัน ตัวซ้ำชนิดเดียวกันนับเป็นคนละตัว)
   // ถ้าสะสมได้มากกว่านั้น ทุก ROTATE_SEC วินาทีจะเปลี่ยน 1 ตัว (ตัวที่อยู่นานสุดจางหายไป ตัวถัดไปจากคิวสุ่มจางเข้ามา)
   // คิวสุ่มรับประกันว่าทุกตัวได้ออกมาครบก่อนเริ่มรอบใหม่
@@ -193,6 +193,8 @@
     clouds.forEach(function (c, i) { c._x0 = i * 170 + 40; c._sp = 5 + i * 2.5; });
     inner.setAttribute('transform', 'translate(' + BASE.x + ' ' + BASE.y + ')');
     stars = Array.prototype.slice.call(svg.querySelectorAll('.star'));
+    swayers = Array.prototype.slice.call(svg.querySelectorAll('.sw')).filter(function (g) { return !inner.contains(g); });
+    swayers.forEach(function (g, i) { g._base = g.getAttribute('transform'); g._ph = i * 1.3; g._tuft = g.classList.contains('tf'); });
     applyDayNight();
     if (!started) { started = true; requestAnimationFrame(frame); setInterval(applyDayNight, 60000); }
   }
@@ -264,8 +266,13 @@
   }
 
   function draw(t, dt, move) {
-    const amp = .5 + Math.max(0, curStage) * .28;
-    const ang = move ? (Math.sin(t * .9) * 1.1 + Math.sin(t * 1.7 + 1) * .5) * amp : 0;
+    const amp = .9 + Math.max(0, curStage) * .5;
+    const gust = .75 + .25 * Math.sin(t * .6);                       // ลมแรงขึ้น-เบาลงเป็นช่วงๆ
+    const ang = move ? (Math.sin(t * 1.8) * 1.5 + Math.sin(t * 3.1 + 1) * .8) * amp * gust : 0;
+    swayers.forEach(function (g) {
+      const a = move ? (Math.sin(t * 2.6 + g._ph) * 7 + Math.sin(t * 4.3 + g._ph * 2) * 3) * gust : 0;
+      g.setAttribute('transform', g._base + ' rotate(' + a.toFixed(2) + (g._tuft ? '' : ' 0 9') + ')');
+    });
     sway.setAttribute('transform', 'rotate(' + ang.toFixed(2) + ' ' + BASE.x + ' ' + BASE.y + ')');
     if (isNight) stars.forEach(function (st, i) {
       st.setAttribute('opacity', (move ? .55 + .45 * Math.sin(t * 2.2 + i * 1.7) : 1).toFixed(2));
