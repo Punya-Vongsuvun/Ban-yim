@@ -136,6 +136,17 @@ service cloud.firestore {
                 && inc(o, d, 'bird') in [0, 1]));
     }
 
+    // ของสุ่มพิเศษ: วันโชคดี (วันละครั้ง) บ้านได้กล่อง +1 โดยไม่ต้องทำภารกิจ
+    // วันโชคดี = SHA-256 ของ "วันที่ไทย:lucky:รหัสบ้าน" 3 ตัวอักษรฐาน 16 แรก น้อยกว่า '0cd' (205/4096 = 5.005%)
+    // ถ้าเปลี่ยนอัตรา ต้องแก้ LUCKY_HEX3 ใน js/store-firebase.js ให้ตรงกัน (0cd = 205)
+    function isLucky(o, d) {
+      return d.diff(o).affectedKeys().hasOnly(['gifts', 'luckyDate'])
+        && o.get('luckyDate', '') != todayStr()
+        && d.luckyDate == todayStr()
+        && d.gifts == o.gifts + 1
+        && hashing.sha256(todayStr() + ':lucky:' + o.code).toHexString()[0:3] < '0cd';
+    }
+
     // ติ๊กได้เฉพาะช่องของบทบาทตัวเอง ครั้งละ 1 ภารกิจ (ระบุใน tick.m) และเฉพาะภารกิจของวันนั้น
     function doneOk(f, o, d) {
       let ks = d.get('done', {}).diff(o.get('done', {})).affectedKeys();
@@ -177,10 +188,11 @@ service cloud.firestore {
         && request.resource.data.roles[request.resource.data.members[request.auth.uid].role] == request.auth.uid;
 
       allow update: if
-        // สมาชิกแก้ได้เฉพาะ 3 แบบ: นับดาว / เปิดกล่อง / ตั้งจำนวนวันท้าทาย (ไม่แตะ members/roles/code/createdAt)
+        // สมาชิกแก้ได้เฉพาะ 4 แบบ: นับดาว / เปิดกล่อง / ตั้งจำนวนวันท้าทาย / วันโชคดี (ไม่แตะ members/roles/code/createdAt)
         (signedIn() && (request.auth.uid in resource.data.members)
           && (isCounting(f, resource.data, request.resource.data)
               || isOpeningGift(resource.data, request.resource.data)
+              || isLucky(resource.data, request.resource.data)
               || isSettingLen(resource.data, request.resource.data)))
         || isJoining(resource.data, request.resource.data)
         || isReleasing(resource.data, request.resource.data);

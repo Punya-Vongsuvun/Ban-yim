@@ -32,6 +32,12 @@
     }
     h += '</div>';
 
+    // วันโชคดี: บ้านได้กล่องฟรี 1 กล่อง (แสดงทั้งวัน)
+    if (v.luckyToday) {
+      h += '<div class="card lucky-card"><span class="gift-ico">🎁</span>' +
+        '<span><b>วันนี้โชคดี!</b><br><small>บ้านเราได้กล่องของขวัญ 1 กล่อง โดยไม่ต้องทำภารกิจ</small></span></div>';
+    }
+
     // กล่องของขวัญ
     if (v.gifts > 0) {
       h += '<button class="gift-card" data-action="openGift"><span class="gift-ico">🎁</span>' +

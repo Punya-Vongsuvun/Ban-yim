@@ -80,6 +80,7 @@ main { padding: 0 14px calc(150px + env(safe-area-inset-bottom)); }
   background: linear-gradient(135deg, #FFE0C2, #FFC9A6); border: 2px solid #F5B58A;
   animation: pulse 1.8s ease-in-out infinite;
 }
+.lucky-card { display: flex; align-items: center; gap: 14px; background: #FFF6D6; border-color: #F2D06B; }
 .gift-ico { font-size: 40px; }
 @keyframes pulse { 50% { transform: scale(1.025); } }
 

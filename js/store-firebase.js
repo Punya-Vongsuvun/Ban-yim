@@ -37,6 +37,9 @@ const ANIMALS = [
   { id: 'firefly',   name: 'หิ่งห้อย', weight: 6,  rarity: 'หายาก' },
   { id: 'bird',      name: 'นก',       weight: 2,  rarity: 'หายากมาก' }
 ];
+// วันโชคดี: โอกาสได้กล่องฟรี 1 กล่อง/วัน = LUCKY_HEX3 / 4096 (205 ≈ 5%)
+// ต้องตรงกับเกณฑ์ '0cd' (= 205) ใน firestore.rules (ฟังก์ชัน isLucky) ถ้าแก้ต้องแก้ทั้งสองที่แล้ววาง Rules ใหม่
+const LUCKY_HEX3 = 205;
 const STAGE_NAMES = ['เมล็ด', 'ต้นอ่อน', 'ต้นกล้า', 'ต้นไม้หนุ่ม', 'ต้นไม้ใหญ่ออกดอก'];
 
 const BUILTIN = [
@@ -92,6 +95,12 @@ function pickMissions(date, code, ids) {
   }
   return a.slice(0, 3);
 }
+// 12 บิตแรกของ SHA-256("วันที่:lucky:รหัสบ้าน") = 3 ตัวอักษรฐาน 16 แรก (เหมือนที่ Rules คำนวณ)
+async function isLuckyDay(date, code) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(date + ':lucky:' + code));
+  const b = new Uint8Array(buf);
+  return ((b[0] << 4) | (b[1] >> 4)) < LUCKY_HEX3;
+}
 function genCode() {
   let s = '';
   for (let i = 0; i < 6; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
@@ -111,6 +120,7 @@ let unsubs = [];
 let dayUnsub = null;
 const subs = [], errSubs = [];
 let pending = false;
+let luckyTried = null;           // บ้าน+วัน ที่เครื่องนี้ลองบันทึกวันโชคดีไปแล้ว (ไม่ลองซ้ำ)
 
 function emptyS() { return { family: null, missions: null, rewards: null, messages: null, day: null, dayLoaded: false, dayKey: null, ensuredFor: null }; }
 
@@ -212,7 +222,7 @@ function startFamily(id) {
       return;
     }
     S.family = snap.data();
-    checkReady();
+    ensureLucky(); checkReady();
   }, recheckMembership));
   unsubs.push(onSnapshot(collection(db, 'families', id, 'missions'), function (snap) {
     S.missions = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
@@ -243,6 +253,7 @@ function watchDay() {
     S.dayLoaded = true;
     ensureDay(); checkReady();
   }, recheckMembership);
+  ensureLucky();
 }
 
 // เครื่องแรกที่เปิดแอปในวันนั้นสร้างข้อมูลของวัน (merge เพื่อไม่ทับข้อมูลที่อีกเครื่องแตะไปแล้ว)
@@ -253,6 +264,26 @@ function ensureDay() {
   setDoc(dayRef(), { missionIds: pickMissions(S.dayKey, famId, ids) }, { merge: true }).catch(function (e) {
     console.warn('สร้างข้อมูลของวันไม่สำเร็จ', e);
   });
+}
+
+// วันโชคดี: เครื่องแรกที่เปิดแอปวันนั้นบันทึก (transaction อ่านซ้ำก่อนเขียน กันได้ซ้ำ) กติกาจริงตรวจที่ Rules
+async function ensureLucky() {
+  if (!famId || !S.family || !S.dayKey) return;
+  const key = famId + S.dayKey;
+  if (luckyTried === key) return;
+  const today = S.dayKey, id = famId;
+  if (S.family.luckyDate === today) { luckyTried = key; return; }
+  luckyTried = key;
+  try {
+    if (!(await isLuckyDay(today, id))) return;
+    await runTransaction(db, async function (tx) {
+      const s = await tx.get(doc(db, 'families', id));
+      if (!s.exists() || s.data().luckyDate === today) return;
+      tx.update(doc(db, 'families', id), { gifts: increment(1), luckyDate: today });
+    });
+  } catch (e) {
+    console.warn('บันทึกวันโชคดีไม่สำเร็จ', e);
+  }
 }
 
 // ข้ามเที่ยงคืน (เวลาไทย) ให้เปลี่ยนไปใช้ข้อมูลของวันใหม่
@@ -291,6 +322,7 @@ function view() {
     treeNumber: f.treeNumber || 1,
     garden: f.garden || [],
     gifts: f.gifts || 0,
+    luckyToday: f.luckyDate === S.dayKey,
     streak: (f.lastCountedDate === S.dayKey || f.lastCountedDate === prevDate(S.dayKey)) ? (f.streak || 0) : 0,
     challengeLen: f.challengeLen || 7,
     collection: f.collection || {},
