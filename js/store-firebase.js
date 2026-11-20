@@ -54,6 +54,10 @@ const ANIMALS = [
 // วันโชคดี: โอกาสได้กล่องฟรี 1 กล่อง/วัน = LUCKY_HEX3 / 4096 (205 ≈ 5%)
 // ต้องตรงกับเกณฑ์ '0cd' (= 205) ใน firestore.rules (ฟังก์ชัน isLucky) ถ้าแก้ต้องแก้ทั้งสองที่แล้ววาง Rules ใหม่
 const LUCKY_HEX3 = 205;
+// ดาวขั้นต่ำของแต่ละขั้นต้นไม้ (ขั้น 1-4) | ครบทุกภารกิจ 3 ข้อ x 7 วัน = 21 ดาว ต้นถึงขั้นสูงสุดพอดี
+const STAGE_AT = [5, 10, 15, 21];
+const TREE_FULL = STAGE_AT[STAGE_AT.length - 1];
+function stageOf(ts) { return STAGE_AT.filter(function (n) { return ts >= n; }).length; }
 const STAGE_NAMES = ['เมล็ด', 'ต้นอ่อน', 'ต้นกล้า', 'ต้นไม้หนุ่ม', 'ต้นไม้ใหญ่ออกดอก'];
 
 const BUILTIN = [
@@ -319,7 +323,7 @@ function view() {
   const missions = S.missions.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
   const done = (S.day && S.day.done) || {};
   const ids = (S.day && S.day.missionIds) || [];
-  const stage = Math.min(4, Math.floor((f.treeStars || 0) / 2));
+  const stage = stageOf(f.treeStars || 0);
   const messages = (S.messages || []).map(function (m) {
     return Object.assign({}, m, { mine: m.from === me.role, isEmoji: EMOJIS.indexOf(m.text) >= 0 });
   });
@@ -333,6 +337,8 @@ function view() {
     activeRoles: activeRoles(f.roles),
     stars: f.stars || 0,
     treeStars: f.treeStars || 0,
+    stageFrom: stage > 0 ? STAGE_AT[stage - 1] : 0,
+    stageTo: STAGE_AT[stage] || TREE_FULL,
     treeNumber: f.treeNumber || 1,
     garden: f.garden || [],
     gifts: f.gifts || 0,
@@ -357,19 +363,19 @@ const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slic
 const parentOnly = () => myRole() === 'dad' || myRole() === 'mom';
 
 /* ---------- กติกานับดาว (คืนค่าฟิลด์ของบ้านที่ต้องอัปเดต) ---------- */
-// ภารกิจครบทุกคนที่อยู่ในบ้าน (พ่อ แม่ ลูก + ลูกคนที่ 2/3 ถ้ามี) 1 ข้อ = 1 ดาว | 2 ดาว = ต้นไม้โต 1 ขั้น | ทุก 3 ดาว = 1 กล่อง
-// ต้นไม้เต็ม (8 ดาว) แล้วได้ดาวถัดไป: ย้ายลงสวนอัตโนมัติ เริ่มต้นใหม่ (ดาวนั้นเป็นของต้นใหม่)
+// ภารกิจครบทุกคนที่อยู่ในบ้าน (พ่อ แม่ ลูก + ลูกคนที่ 2/3 ถ้ามี) 1 ข้อ = 1 ดาว | ต้นไม้โตขั้น 1-4 ที่ 5/10/15/21 ดาว | ทุก 3 ดาว = 1 กล่อง
+// ต้นไม้เต็ม (21 ดาว) แล้วได้ดาวถัดไป: ย้ายลงสวนอัตโนมัติ เริ่มต้นใหม่ (ดาวนั้นเป็นของต้นใหม่)
 // วันท้าทาย: นับวันละ 1 ครั้งเมื่อมีภารกิจครบทุกคนข้อแรก ครบ challengeLen = +2 กล่อง แล้วเริ่มนับใหม่
 function countStar(f, today) {
   const fu = {};
   const stars = (f.stars || 0) + 1;
   let ts = f.treeStars || 0, tn = f.treeNumber || 1, gifts = f.gifts || 0;
-  if (ts >= 8) {
+  if (ts >= TREE_FULL) {
     fu.garden = (f.garden || []).concat([{ number: tn, date: today }]);
     tn += 1; ts = 1;
   } else ts += 1;
   fu.stars = stars; fu.treeStars = ts; fu.treeNumber = tn;
-  fu.treeStage = Math.min(4, Math.floor(ts / 2));
+  fu.treeStage = stageOf(ts);
   if (stars % 3 === 0) gifts += 1;
   if (f.lastCountedDate !== today) {
     const prev = f.lastCountedDate === prevDate(today) ? (f.streak || 0) : 0;

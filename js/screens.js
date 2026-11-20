@@ -20,13 +20,13 @@
     let h = '';
 
     // แถบดาว + ชื่อขั้นของต้นไม้
-    const have = v.treeStars % 2;
+    const have = v.treeStars - v.stageFrom, need = v.stageTo - v.stageFrom;
     h += '<div class="card stars-card">' +
       '<div class="stars-row"><span class="big-star">⭐</span><span class="stars-num">' + v.stars + '</span><span class="stars-label">ดาวสะสม</span></div>' +
       '<div class="stage-name">ต้นไม้ของเรา: <b>' + esc(v.stageName) + '</b></div>';
     if (v.stage < 4) {
-      h += '<div class="progress" aria-hidden="true"><i class="' + (have >= 1 ? 'on' : '') + '"></i><i></i></div>' +
-        '<div class="hint">อีก ' + (2 - have) + ' ดาว ต้นไม้จะโตขึ้น</div>';
+      h += '<div class="progress" aria-hidden="true">' + Array.from({ length: need }, function (_, i) { return '<i class="' + (i < have ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
+        '<div class="hint">อีก ' + (need - have) + ' ดาว ต้นไม้จะโตขึ้น</div>';
     } else {
       h += '<div class="hint">ต้นไม้โตเต็มที่แล้ว 🎉 ได้ดาวดวงต่อไป ต้นไม้จะไปอยู่ในสวน</div>';
     }

@@ -83,11 +83,14 @@ service cloud.firestore {
     }
 
     function validStage(d) {
-      return (d.treeStage < 4 && d.treeStars >= d.treeStage * 2 && d.treeStars <= d.treeStage * 2 + 1)
-        || (d.treeStage == 4 && d.treeStars >= 8);
+      return (d.treeStage == 0 && d.treeStars < 5)
+        || (d.treeStage == 1 && d.treeStars >= 5 && d.treeStars < 10)
+        || (d.treeStage == 2 && d.treeStars >= 10 && d.treeStars < 15)
+        || (d.treeStage == 3 && d.treeStars >= 15 && d.treeStars < 21)
+        || (d.treeStage == 4 && d.treeStars >= 21);
     }
     function treeOk(o, d) {
-      return o.treeStars < 8
+      return o.treeStars < 21
         ? (d.treeStars == o.treeStars + 1 && d.treeNumber == o.treeNumber && d.garden == o.garden)
         : (d.treeStars == 1 && d.treeNumber == o.treeNumber + 1
             && d.garden.size() == o.garden.size() + 1
