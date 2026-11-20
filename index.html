@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFF9F3">
+<title>บ้านยิ้ม</title>
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-512.png">
+<meta name="apple-mobile-web-app-title" content="บ้านยิ้ม">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">🏠 บ้านยิ้ม</div>
+    <div id="whoChip" class="who-chip"></div>
+  </header>
+
+  <main>
+    <!-- 1. บ้าน -->
+    <section id="screen-home" class="screen active">
+      <div class="scene-card">
+        <svg id="scene" viewBox="0 0 400 440" role="img" aria-label="สวนของบ้านยิ้ม มีต้นไม้และสัตว์ตัวเล็กๆ"></svg>
+      </div>
+      <div id="homeBody"></div>
+    </section>
+
+    <!-- 2. ท้าทาย -->
+    <section id="screen-challenge" class="screen"></section>
+
+    <!-- 3. สะสม -->
+    <section id="screen-collect" class="screen"></section>
+
+    <!-- 4. ข้อความ (ช่องพิมพ์และแผงอิโมจิอยู่นอกส่วนที่วาดใหม่ เพื่อไม่ให้ข้อความที่กำลังพิมพ์หาย) -->
+    <section id="screen-messages" class="screen">
+      <h2>ข้อความถึงกัน</h2>
+      <div id="msgList" class="msg-list"></div>
+      <div class="form-card">
+        <div class="label">แตะอิโมจิเพื่อส่งทันที</div>
+        <div id="emojiPanel" class="emoji-panel"></div>
+        <div class="label">หรือพิมพ์ข้อความสั้นๆ</div>
+        <div class="row">
+          <input id="msgText" type="text" maxlength="60" placeholder="พิมพ์ข้อความ" autocomplete="off">
+          <button class="btn" data-action="sendMsg">ส่ง</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. พ่อแม่ -->
+    <section id="screen-parents" class="screen">
+      <div id="parentsHead" class="hello"></div>
+      <div id="parentsNote"></div>
+      <div id="houseCard"></div>
+
+      <h2>สมาชิกในบ้าน</h2>
+      <div id="memberList" class="list"></div>
+
+      <h2>ชุดภารกิจ</h2>
+      <div id="missionList" class="list"></div>
+      <div id="missionForm" class="form-card">
+        <div class="label">เพิ่มภารกิจใหม่ (เลือกไอคอน แล้วพิมพ์ชื่อ)</div>
+        <div id="iconPicker" class="icon-picker"></div>
+        <div class="row">
+          <input id="missionTitle" type="text" maxlength="40" placeholder="ชื่อภารกิจ" autocomplete="off">
+          <button class="btn" data-action="addMission">เพิ่ม</button>
+        </div>
+      </div>
+
+      <h2>รางวัลจริง</h2>
+      <div id="rewardList" class="list"></div>
+      <div id="rewardForm" class="form-card">
+        <div class="label">เพิ่มรางวัลจริง</div>
+        <div class="row">
+          <input id="rewardTitle" type="text" maxlength="40" placeholder="เช่น ไปกินไอศกรีม" autocomplete="off">
+          <button class="btn" data-action="addReward">เพิ่ม</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="เมนูหลัก">
+    <button class="tab active" data-action="tab" data-tab="home"><span class="ti">🏡</span><span>บ้าน</span></button>
+    <button class="tab" data-action="tab" data-tab="challenge"><span class="ti">🏆</span><span>ท้าทาย</span></button>
+    <button class="tab" data-action="tab" data-tab="collect"><span class="ti">📖</span><span>สะสม</span></button>
+    <button class="tab" data-action="tab" data-tab="messages"><span class="ti">💬</span><span>ข้อความ</span><i id="msgBadge" class="badge" hidden></i></button>
+    <button class="tab" data-action="tab" data-tab="parents"><span class="ti">👨‍👩‍👧</span><span>พ่อแม่</span></button>
+  </nav>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="welcome" class="welcome"></div>
+<div id="toast" class="toast" hidden role="status"></div>
+<div id="bootError" class="welcome" hidden><div class="welcome-box"><div class="welcome-logo">🏡</div><h1>บ้านยิ้ม</h1>
+  <p class="w-error">โหลดแอปไม่สำเร็จ ต้องมีอินเทอร์เน็ตตอนเปิดครั้งแรก</p>
+  <button class="btn wide" onclick="location.reload()">ลองใหม่</button></div></div>
+
+<!-- ลำดับสำคัญ: store (โมดูล) ต้องมาก่อนสคริปต์อื่น (defer ทำงานตามลำดับ) -->
+<script type="module" src="js/store-firebase.js"></script>
+<script defer src="js/animals.js"></script>
+<script defer src="js/scene.js"></script>
+<script defer src="js/screens.js"></script>
+<script defer src="js/welcome.js"></script>
+<script defer src="js/app.js"></script>
+<script>
+  // ถ้าโหลด Firebase ไม่ได้ (เช่น ออฟไลน์ตอนเปิดครั้งแรก) ให้แจ้งแทนหน้าว่าง
+  setTimeout(function () { if (!window.Store) document.getElementById('bootError').hidden = false; }, 6000);
+</script>
+</body>
+</html>

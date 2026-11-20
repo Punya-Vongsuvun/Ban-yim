@@ -1,0 +1,255 @@
+rules_version = '2';
+
+// บ้านยิ้ม — Security Rules (เฟส 3: ดาว/ต้นไม้/กล่อง/สตรีค แก้ตรงๆ ไม่ได้ ต้องตรงกติกา)
+// families/{รหัสบ้าน}: members { uid: {role, name} } และ roles { dad|mom|kid|kid2|kid3: uid }
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function famData(f) {
+      return get(/databases/$(database)/documents/families/$(f)).data;
+    }
+    function isMember(f) {
+      return signedIn() && (request.auth.uid in famData(f).members);
+    }
+    function isParent(f) {
+      return isMember(f) && famData(f).members[request.auth.uid].role in ['dad', 'mom'];
+    }
+
+    // เข้าร่วมบ้าน: เพิ่มตัวเองเข้า members/roles ด้วยบทบาทที่ยังว่างเท่านั้น
+    function isJoining(o, d) {
+      let uid = request.auth.uid;
+      let r = d.members[uid].role;
+      return signedIn()
+        && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
+        && !(uid in o.members)
+        && r in ['dad', 'mom', 'kid', 'kid2', 'kid3']
+        && !(r in o.roles)
+        && d.roles[r] == uid
+        && d.roles.diff(o.roles).affectedKeys().hasOnly([r])
+        && d.members.diff(o.members).affectedKeys().hasOnly([uid])
+        && d.members[uid].keys().hasOnly(['role', 'name'])
+        && d.members[uid].name is string
+        && d.members[uid].name.size() <= 20;
+    }
+
+    // พ่อ/แม่ปล่อยบทบาทของคนอื่น (ปล่อยของตัวเองไม่ได้)
+    function releasesRole(o, d, r) {
+      return (r in o.roles)
+        && !(r in d.roles)
+        && o.roles[r] != request.auth.uid
+        && d.roles.diff(o.roles).affectedKeys().hasOnly([r])
+        && !(o.roles[r] in d.members)
+        && d.members.diff(o.members).affectedKeys().hasOnly([o.roles[r]]);
+    }
+    function isReleasing(o, d) {
+      return (request.auth.uid in o.members)
+        && o.members[request.auth.uid].role in ['dad', 'mom']
+        && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
+        && (releasesRole(o, d, 'dad') || releasesRole(o, d, 'mom') || releasesRole(o, d, 'kid')
+            || releasesRole(o, d, 'kid2') || releasesRole(o, d, 'kid3'));
+    }
+
+    // ---------- เวลาไทย (UTC+7) ----------
+    function pad2(n) { return n < 10 ? '0' + string(n) : string(n); }
+    function ymd(t) { return string(t.year()) + '-' + pad2(t.month()) + '-' + pad2(t.day()); }
+    function todayStr() { return ymd(request.time + duration.value(7, 'h')); }
+    function yesterdayStr() { return ymd(request.time + duration.value(7, 'h') - duration.value(1, 'd')); }
+    function dayPath(f) { return /databases/$(database)/documents/families/$(f)/days/$(todayStr()); }
+
+    // ---------- กติกานับดาว ----------
+    // ภารกิจ mid ที่ "เพิ่งถูกนับ" ในคำขอนี้ (ดูจากเอกสารของวันก่อน/หลังเขียน)
+    function countedBefore(f) { return get(dayPath(f)).data.get('counted', {}); }
+    function countedAfter(f) { return getAfter(dayPath(f)).data.get('counted', {}); }
+    function newlyCounted(f) { return countedAfter(f).diff(countedBefore(f)).affectedKeys(); }
+    // ในคำขอเดียวกัน เอกสารของวันต้องมีภารกิจที่เพิ่งถูกนับ "ข้อเดียว" (ข้อที่ระบุใน tick.m) และครบทุกคนในบ้านจริง
+    function oneNewlyCounted(f) {
+      let dn = getAfter(dayPath(f)).data;
+      let mid = dn.tick.m;
+      let ks = newlyCounted(f);
+      return ks.size() == 1
+        && ks.hasOnly([mid])
+        && !(mid in countedBefore(f))
+        && countedAfter(f)[mid] == true
+        && (mid in dn.missionIds)
+        && dn.done[mid].get('dad', false) == true
+        && dn.done[mid].get('mom', false) == true
+        && dn.done[mid].get('kid', false) == true
+        // ลูกคนที่ 2/3: ถ้ามีคนเลือกบทบาทนั้นในบ้านแล้ว ต้องทำด้วย (ยังไม่มีคนเลือกไม่ต้องรอ)
+        && (!('kid2' in famData(f).roles) || dn.done[mid].get('kid2', false) == true)
+        && (!('kid3' in famData(f).roles) || dn.done[mid].get('kid3', false) == true);
+    }
+
+    function validStage(d) {
+      return (d.treeStage == 0 && d.treeStars < 5)
+        || (d.treeStage == 1 && d.treeStars >= 5 && d.treeStars < 10)
+        || (d.treeStage == 2 && d.treeStars >= 10 && d.treeStars < 15)
+        || (d.treeStage == 3 && d.treeStars >= 15 && d.treeStars < 21)
+        || (d.treeStage == 4 && d.treeStars >= 21);
+    }
+    function treeOk(o, d) {
+      return o.treeStars < 21
+        ? (d.treeStars == o.treeStars + 1 && d.treeNumber == o.treeNumber && d.garden == o.garden)
+        : (d.treeStars == 1 && d.treeNumber == o.treeNumber + 1
+            && d.garden.size() == o.garden.size() + 1
+            && d.garden.hasAll(o.garden)
+            && d.garden[o.garden.size()].number == o.treeNumber);
+    }
+    // ผลของวันท้าทาย: คืน [streak ใหม่, กล่องโบนัส]
+    function streakOk(o, d, giftsFromStars) {
+      let today = todayStr();
+      return o.lastCountedDate == today
+        ? (d.lastCountedDate == today && d.streak == o.streak && d.gifts == o.gifts + giftsFromStars)
+        : (d.lastCountedDate == today
+            && ((o.lastCountedDate == yesterdayStr() ? o.streak : 0) + 1 >= o.challengeLen
+                ? (d.streak == 0 && d.gifts == o.gifts + giftsFromStars + 2)
+                : (d.streak == (o.lastCountedDate == yesterdayStr() ? o.streak : 0) + 1
+                   && d.gifts == o.gifts + giftsFromStars)));
+    }
+    function isCounting(f, o, d) {
+      // เช็กเรื่องถูกๆ ก่อน (ดาว/ต้นไม้/สตรีค) แล้วค่อยตรวจเอกสารของวัน
+      return d.diff(o).affectedKeys().hasOnly(['stars', 'treeStars', 'treeStage', 'treeNumber', 'garden', 'gifts', 'streak', 'lastCountedDate'])
+        && d.stars == o.stars + 1
+        && treeOk(o, d)
+        && validStage(d)
+        && streakOk(o, d, d.stars % 3 == 0 ? 1 : 0)
+        && oneNewlyCounted(f);
+    }
+
+    // เปลี่ยนจำนวนวันท้าทาย
+    function isSettingLen(o, d) {
+      return d.diff(o).affectedKeys().hasOnly(['challengeLen']) && d.challengeLen in [7, 21, 30];
+    }
+
+    // เปิดกล่องของขวัญ: กล่อง -1 และ (ได้สัตว์ 1 ตัว หรือไม่ได้สัตว์ = รางวัลจริง)
+    function inc(o, d, a) { return d.collection.get(a, 0) - o.collection.get(a, 0); }
+    function isOpeningGift(o, d) {
+      let ks = d.collection.diff(o.collection).affectedKeys();
+      return d.diff(o).affectedKeys().hasOnly(['gifts', 'collection'])
+        && o.gifts > 0
+        && d.gifts == o.gifts - 1
+        && (ks.size() == 0
+            || (ks.size() == 1
+                && ks.hasOnly(['butterfly', 'ladybug', 'bee', 'dragonfly', 'snail', 'firefly', 'bird', 'ant', 'cricket', 'grasshopper', 'caterpillar', 'frog', 'chick', 'goldfish', 'turtle', 'rabbit', 'squirrel', 'hedgehog', 'owl', 'deer'])
+                && inc(o, d, 'butterfly') in [0, 1] && inc(o, d, 'ladybug') in [0, 1] && inc(o, d, 'bee') in [0, 1] && inc(o, d, 'dragonfly') in [0, 1]
+                && inc(o, d, 'snail') in [0, 1] && inc(o, d, 'firefly') in [0, 1] && inc(o, d, 'bird') in [0, 1] && inc(o, d, 'ant') in [0, 1]
+                && inc(o, d, 'cricket') in [0, 1] && inc(o, d, 'grasshopper') in [0, 1] && inc(o, d, 'caterpillar') in [0, 1] && inc(o, d, 'frog') in [0, 1]
+                && inc(o, d, 'chick') in [0, 1] && inc(o, d, 'goldfish') in [0, 1] && inc(o, d, 'turtle') in [0, 1] && inc(o, d, 'rabbit') in [0, 1]
+                && inc(o, d, 'squirrel') in [0, 1] && inc(o, d, 'hedgehog') in [0, 1] && inc(o, d, 'owl') in [0, 1] && inc(o, d, 'deer') in [0, 1]));
+    }
+
+    // ของสุ่มพิเศษ: วันโชคดี (วันละครั้ง) บ้านได้กล่อง +1 โดยไม่ต้องทำภารกิจ
+    // วันโชคดี = SHA-256 ของ "วันที่ไทย:lucky:รหัสบ้าน" 3 ตัวอักษรฐาน 16 แรก น้อยกว่า '0cd' (205/4096 = 5.005%)
+    // ถ้าเปลี่ยนอัตรา ต้องแก้ LUCKY_HEX3 ใน js/store-firebase.js ให้ตรงกัน (0cd = 205)
+    function isLucky(o, d) {
+      return d.diff(o).affectedKeys().hasOnly(['gifts', 'luckyDate'])
+        && o.get('luckyDate', '') != todayStr()
+        && d.luckyDate == todayStr()
+        && d.gifts == o.gifts + 1
+        && hashing.sha256(todayStr() + ':lucky:' + o.code).toHexString()[0:3] < '0cd';
+    }
+
+    // ติ๊กได้เฉพาะช่องของบทบาทตัวเอง ครั้งละ 1 ภารกิจ (ระบุใน tick.m) และเฉพาะภารกิจของวันนั้น
+    function doneOk(f, o, d) {
+      let ks = d.get('done', {}).diff(o.get('done', {})).affectedKeys();
+      let me = famData(f).members[request.auth.uid].role;
+      return ks.size() == 0
+        || ((d.tick.m in o.missionIds)
+            && ks.hasOnly([d.tick.m])
+            && d.done[d.tick.m].diff(o.get('done', {}).get(d.tick.m, {})).affectedKeys().hasOnly([me])
+            && d.done[d.tick.m][me] is bool);
+    }
+    // เพิ่ม counted ได้ก็ต่อเมื่อเอกสารบ้านเปลี่ยนพร้อมกัน (ดาว +1) และไม่ลบ counted เดิม
+    function countedOk(f, o, d) {
+      let ks = d.get('counted', {}).diff(o.get('counted', {})).affectedKeys();
+      return ks.size() == 0
+        || (ks.size() == 1
+            && ks.hasOnly([d.tick.m])
+            && !(d.tick.m in o.get('counted', {}))
+            && getAfter(/databases/$(database)/documents/families/$(f)).data.stars
+               == get(/databases/$(database)/documents/families/$(f)).data.stars + 1);
+    }
+
+    match /families/{f} {
+      // อ่านเอกสารบ้านเดียวได้ถ้ารู้รหัส (เพื่อเข้าร่วม) แต่ค้นหารายชื่อบ้านไม่ได้
+      allow get: if signedIn();
+      allow list: if false;
+
+      // สร้างบ้าน: ผู้สร้างต้องเป็นพ่อหรือแม่ และเป็นสมาชิกคนแรกคนเดียว
+      allow create: if signedIn()
+        && f.matches('[A-HJ-NP-Z2-9]{6}')
+        && request.resource.data.keys().hasOnly(['name', 'code', 'createdAt', 'members', 'roles',
+             'stars', 'treeStars', 'treeStage', 'treeNumber', 'garden', 'gifts',
+             'streak', 'challengeLen', 'lastCountedDate', 'collection'])
+        && request.resource.data.code == f
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid].role in ['dad', 'mom']
+        && request.resource.data.members[request.auth.uid].keys().hasOnly(['role', 'name'])
+        && request.resource.data.roles.keys().hasOnly([request.resource.data.members[request.auth.uid].role])
+        && request.resource.data.roles[request.resource.data.members[request.auth.uid].role] == request.auth.uid;
+
+      allow update: if
+        // สมาชิกแก้ได้เฉพาะ 4 แบบ: นับดาว / เปิดกล่อง / ตั้งจำนวนวันท้าทาย / วันโชคดี (ไม่แตะ members/roles/code/createdAt)
+        (signedIn() && (request.auth.uid in resource.data.members)
+          && (isCounting(f, resource.data, request.resource.data)
+              || isOpeningGift(resource.data, request.resource.data)
+              || isLucky(resource.data, request.resource.data)
+              || isSettingLen(resource.data, request.resource.data)))
+        || isJoining(resource.data, request.resource.data)
+        || isReleasing(resource.data, request.resource.data);
+
+      allow delete: if false;
+
+      // ข้อมูลของแต่ละวัน: สมาชิกอ่าน/แตะภารกิจได้ แต่เปลี่ยนชุดภารกิจของวันไม่ได้
+      match /days/{d} {
+        allow read: if isMember(f);
+        // สร้างได้เฉพาะชุดภารกิจของวัน (ยังไม่มีการติ๊ก/นับ)
+        allow create: if isMember(f)
+          && d.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+          && request.resource.data.keys().hasOnly(['missionIds'])
+          && request.resource.data.missionIds.size() <= 3;
+        // แก้ได้: ติ๊กช่องของ "บทบาทตัวเอง" ครั้งละ 1 ภารกิจ และ counted (ต้องมาพร้อมการนับดาวของบ้าน)
+        allow update: if isMember(f)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', 'counted', 'tick'])
+          && (!('tick' in request.resource.data) || (request.resource.data.tick.keys().hasOnly(['m']) && request.resource.data.tick.m is string))
+          && doneOk(f, resource.data, request.resource.data)
+          && countedOk(f, resource.data, request.resource.data);
+        allow delete: if false;
+      }
+
+      // ชุดภารกิจและรางวัลจริง: ทุกคนอ่านได้ แต่ พ่อ/แม่ เท่านั้นที่แก้ได้ (ลูกแก้ไม่ได้)
+      match /missions/{m} {
+        allow read: if isMember(f);
+        allow write: if isParent(f);
+      }
+      match /rewards/{r} {
+        allow read: if isMember(f);
+        allow write: if isParent(f);
+      }
+
+      // ข้อความสั้น/อิโมจิ: สมาชิกอ่านได้ ส่งได้ในนามบทบาทของตัวเองเท่านั้น (ยาวไม่เกิน 60 ตัวอักษร)
+      // เวลาต้องเป็นเวลาเซิร์ฟเวอร์ ส่งแล้วแก้/ลบไม่ได้
+      match /messages/{g} {
+        allow read: if isMember(f);
+        allow create: if isMember(f)
+          && request.resource.data.keys().hasOnly(['from', 'text', 'at'])
+          && request.resource.data.from == famData(f).members[request.auth.uid].role
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 60
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
+      // บันทึกการเปิดกล่องของขวัญ: เพิ่มได้อย่างเดียว
+      match /giftLog/{g} {
+        allow read: if isMember(f);
+        allow create: if isMember(f);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
