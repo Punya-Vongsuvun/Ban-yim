@@ -35,7 +35,22 @@
     <!-- 3. สะสม -->
     <section id="screen-collect" class="screen"></section>
 
-    <!-- 4. พ่อแม่ -->
+    <!-- 4. ข้อความ (ช่องพิมพ์และแผงอิโมจิอยู่นอกส่วนที่วาดใหม่ เพื่อไม่ให้ข้อความที่กำลังพิมพ์หาย) -->
+    <section id="screen-messages" class="screen">
+      <h2>ข้อความถึงกัน</h2>
+      <div id="msgList" class="msg-list"></div>
+      <div class="form-card">
+        <div class="label">แตะอิโมจิเพื่อส่งทันที</div>
+        <div id="emojiPanel" class="emoji-panel"></div>
+        <div class="label">หรือพิมพ์ข้อความสั้นๆ</div>
+        <div class="row">
+          <input id="msgText" type="text" maxlength="60" placeholder="พิมพ์ข้อความ" autocomplete="off">
+          <button class="btn" data-action="sendMsg">ส่ง</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. พ่อแม่ -->
     <section id="screen-parents" class="screen">
       <div id="parentsHead" class="hello"></div>
       <div id="parentsNote"></div>
@@ -71,6 +86,7 @@
     <button class="tab active" data-action="tab" data-tab="home"><span class="ti">🏡</span><span>บ้าน</span></button>
     <button class="tab" data-action="tab" data-tab="challenge"><span class="ti">🏆</span><span>ท้าทาย</span></button>
     <button class="tab" data-action="tab" data-tab="collect"><span class="ti">📖</span><span>สะสม</span></button>
+    <button class="tab" data-action="tab" data-tab="messages"><span class="ti">💬</span><span>ข้อความ</span><i id="msgBadge" class="badge" hidden></i></button>
     <button class="tab" data-action="tab" data-tab="parents"><span class="ti">👨‍👩‍👧</span><span>พ่อแม่</span></button>
   </nav>
 </div>

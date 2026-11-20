@@ -148,13 +148,13 @@ input[type=text]:focus { outline: none; border-color: var(--primary); }
 /* ---------- เมนูล่าง ---------- */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   max-width: 480px; margin: 0 auto;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, .96); backdrop-filter: blur(10px);
   border-top: 2px solid var(--line); border-radius: 22px 22px 0 0;
 }
-.tab { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; border-radius: 16px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.tab { position: relative; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; border-radius: 16px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .tab .ti { font-size: 24px; line-height: 1.1; filter: grayscale(.6); transition: transform .2s; }
 .tab.active { color: var(--primary-dark); background: var(--soft); }
 .tab.active .ti { filter: none; transform: translateY(-2px) scale(1.1); }
@@ -199,3 +199,18 @@ input[type=text]:focus { outline: none; border-color: var(--primary); }
 .house-card { text-align: center; }
 .btn-small { flex: none; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--soft); color: var(--primary-dark); font-weight: 600; font-size: 14px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 90; max-width: 90%; background: #4A2C1D; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+
+/* ---------- ข้อความถึงกัน ---------- */
+.badge { position: absolute; top: 2px; right: 50%; margin-right: -26px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #E04B3A; color: #fff; font-style: normal; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; border: 2px solid #fff; box-sizing: content-box; }
+.msg-list { display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; flex-direction: column; max-width: 85%; }
+.msg.mine { align-self: flex-end; align-items: flex-end; }
+.msg.other { align-self: flex-start; align-items: flex-start; }
+.msg-who { font-size: 12px; color: var(--muted); margin: 0 6px 2px; }
+.bubble { padding: 8px 14px; border-radius: 18px; background: var(--card); border: 2px solid var(--c, var(--line)); overflow-wrap: anywhere; }
+.msg.mine .bubble { background: var(--soft); border-bottom-right-radius: 6px; }
+.msg.other .bubble { border-bottom-left-radius: 6px; }
+.bubble.emoji { font-size: 38px; line-height: 1.2; padding: 4px 14px; }
+.emoji-panel { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 12px; }
+.emoji-panel .ic { min-height: 52px; font-size: 28px; border-radius: 12px; background: var(--bg); border: 2px solid var(--line); }
+.emoji-panel .ic:active { background: var(--soft); border-color: var(--primary); }

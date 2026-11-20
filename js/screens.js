@@ -105,7 +105,30 @@
     return h;
   }
 
-  /* ---------- 4. พ่อแม่ ---------- */
+  /* ---------- ข้อความ ---------- */
+  const timeFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
+  const dayFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' });
+  const ymdFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+  function messages(v) {
+    if (!v.messages.length) {
+      return '<div class="card muted center">ยังไม่มีข้อความ 💬<br>ลองส่งอิโมจิหาครอบครัวดูสิ</div>';
+    }
+    return v.messages.map(function (m) {
+      const d = new Date(m.t);
+      const when = (ymdFmt.format(d) === v.date ? '' : dayFmt.format(d) + ' ') + timeFmt.format(d);
+      const name = R[m.from] ? R[m.from].emoji + ' ' + esc(v.names[m.from] || R[m.from].name) : '';
+      return '<div class="msg ' + (m.mine ? 'mine' : 'other') + '">' +
+        '<div class="msg-who">' + name + ' · ' + when + '</div>' +
+        '<div class="bubble' + (m.isEmoji ? ' emoji' : '') + '" style="--c:' + (R[m.from] ? R[m.from].color : '#ccc') + '">' + esc(m.text) + '</div></div>';
+    }).join('');
+  }
+  function emojiPanel() {
+    return Store.EMOJIS.map(function (e) {
+      return '<button class="ic" data-action="sendEmoji" data-e="' + e + '" aria-label="ส่ง ' + e + '">' + e + '</button>';
+    }).join('');
+  }
+
+  /* ---------- 5. พ่อแม่ ---------- */
   function parentsHead(v) {
     return '<span class="hello-emoji">' + R[v.me].emoji + '</span> สวัสดี ' + esc(v.names[v.me] || R[v.me].name);
   }
@@ -154,5 +177,5 @@
     }).join('');
   }
 
-  window.Screens = { esc, home, challenge, collect, parentsHead, parentsNote, houseCard, memberList, missionList, rewardList, iconPicker };
+  window.Screens = { esc, home, challenge, collect, messages, emojiPanel, parentsHead, parentsNote, houseCard, memberList, missionList, rewardList, iconPicker };
 })();

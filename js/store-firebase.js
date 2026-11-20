@@ -4,7 +4,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.4.0/firebas
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot,
+  doc, collection, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, onSnapshot,
+  query, orderBy, limit,
   runTransaction, writeBatch, increment, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -35,6 +36,11 @@ const BUILTIN = [
   ['🚶', 'ออกกำลังกายด้วยกัน'], ['🙏', 'พูดขอบคุณกัน'], ['📵', 'งดมือถือตอนกินข้าว'],
   ['🤗', 'กอดกันก่อนนอน']
 ].map((m, i) => ({ id: 'b' + (i + 1), icon: m[0], title: m[1], builtIn: true, active: true, order: i + 1 }));
+
+// ข้อความสั้นและอิโมจิ: ยาวไม่เกิน 60 ตัวอักษร (ต้องตรงกับ firestore.rules) แสดง 50 ข้อความล่าสุด
+const EMOJIS = ['❤️', '😊', '👍', '🎉', '😘', '🤗', '😂', '⭐', '🙏', '😴', '🍚', '🏠'];
+const MSG_MAX = 60;
+const MSG_SHOW = 50;
 
 const DEFAULT_REWARDS = ['เลือกหนังเรื่องโปรดดูด้วยกัน', 'ไอศกรีม 1 ถ้วย', 'เลือกเมนูมื้อเย็น'];
 
@@ -97,7 +103,17 @@ let dayUnsub = null;
 const subs = [], errSubs = [];
 let pending = false;
 
-function emptyS() { return { family: null, missions: null, rewards: null, day: null, dayLoaded: false, dayKey: null, ensuredFor: null }; }
+function emptyS() { return { family: null, missions: null, rewards: null, messages: null, day: null, dayLoaded: false, dayKey: null, ensuredFor: null }; }
+
+/* เวลาของข้อความล่าสุดที่เครื่องนี้เปิดอ่านแล้ว (เก็บในเครื่องแยกตามบ้าน ใช้ทำจุดแดง) */
+let seenMs = 0;
+function seenKey(id) { return 'banyim-seen-v1-' + id; }
+function readSeen(id) {
+  try { return Number(localStorage.getItem(seenKey(id))) || 0; } catch (e) { return 0; }
+}
+function writeSeen(id, ms) {
+  try { localStorage.setItem(seenKey(id), String(ms)); } catch (e) { /* ไม่เป็นไร */ }
+}
 
 function emit() {
   if (pending) return;
@@ -176,6 +192,7 @@ function startFamily(id) {
   famId = id;
   saveSession(id);
   S = emptyS();
+  seenMs = readSeen(id);
   setStatus('loading');
   unsubs.push(onSnapshot(famRef(), function (snap) {
     if (!snap.exists() || !(myUid() in (snap.data().members || {}))) {
@@ -195,6 +212,14 @@ function startFamily(id) {
   unsubs.push(onSnapshot(collection(db, 'families', id, 'rewards'), function (snap) {
     S.rewards = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
     checkReady();
+  }, recheckMembership));
+  // ข้อความ: ฟังเฉพาะ 50 ข้อความล่าสุด (ไม่รอให้โหลดเสร็จก่อนเปิดแอป)
+  unsubs.push(onSnapshot(query(collection(db, 'families', id, 'messages'), orderBy('at', 'desc'), limit(MSG_SHOW)), function (snap) {
+    S.messages = snap.docs.map(function (d) {
+      const x = d.data({ serverTimestamps: 'estimate' });
+      return { id: d.id, from: x.from, text: String(x.text || ''), t: x.at && x.at.toMillis ? x.at.toMillis() : Date.now() };
+    }).reverse();
+    emit();
   }, recheckMembership));
   watchDay();
 }
@@ -241,7 +266,12 @@ function view() {
   const done = (S.day && S.day.done) || {};
   const ids = (S.day && S.day.missionIds) || [];
   const stage = Math.min(4, Math.floor((f.treeStars || 0) / 2));
+  const messages = (S.messages || []).map(function (m) {
+    return Object.assign({}, m, { mine: m.from === me.role, isEmoji: EMOJIS.indexOf(m.text) >= 0 });
+  });
   return {
+    messages,
+    unread: messages.filter(function (m) { return !m.mine && m.t > seenMs; }).length,
     code: famId,
     me: me.role,
     names,
@@ -318,6 +348,19 @@ const A = {
       tx.update(dRef, up);
       if (fu) tx.update(fRef, fu);
     }));
+  },
+  // ส่งข้อความสั้น/อิโมจิ: คืน true ถ้าส่งคำขอแล้ว
+  sendMessage(text) {
+    text = String(text || '').trim();
+    if (!text || Array.from(text).length > MSG_MAX) return false;
+    run(addDoc(collection(db, 'families', famId, 'messages'), { from: myRole(), text, at: serverTimestamp() }));
+    return true;
+  },
+  // เปิดหน้าข้อความแล้ว: จำว่าอ่านถึงข้อความล่าสุดแล้ว (จุดแดงหาย)
+  markSeen() {
+    if (!famId || !S.messages || !S.messages.length) return;
+    const newest = S.messages[S.messages.length - 1].t;
+    if (newest > seenMs) { seenMs = newest; writeSeen(famId, newest); emit(); }
   },
   setLen(n) {
     if ([7, 21, 30].includes(n)) run(updateDoc(famRef(), { challengeLen: n }));
@@ -439,7 +482,7 @@ async function join(code, role) {
 function enter(code) { startFamily(cleanCode(code)); }
 
 window.Store = {
-  ROLES, ROLE_IDS, ANIMALS, STAGE_NAMES, DEFAULT_NAMES,
+  ROLES, ROLE_IDS, ANIMALS, STAGE_NAMES, DEFAULT_NAMES, EMOJIS, MSG_MAX,
   animal: id => ANIMALS.find(a => a.id === id),
   status: () => status,
   statusMsg: () => statusMsg,

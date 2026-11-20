@@ -210,6 +210,20 @@ service cloud.firestore {
         allow write: if isParent(f);
       }
 
+      // ข้อความสั้น/อิโมจิ: สมาชิกอ่านได้ ส่งได้ในนามบทบาทของตัวเองเท่านั้น (ยาวไม่เกิน 60 ตัวอักษร)
+      // เวลาต้องเป็นเวลาเซิร์ฟเวอร์ ส่งแล้วแก้/ลบไม่ได้
+      match /messages/{g} {
+        allow read: if isMember(f);
+        allow create: if isMember(f)
+          && request.resource.data.keys().hasOnly(['from', 'text', 'at'])
+          && request.resource.data.from == famData(f).members[request.auth.uid].role
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 60
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
       // บันทึกการเปิดกล่องของขวัญ: เพิ่มได้อย่างเดียว
       match /giftLog/{g} {
         allow read: if isMember(f);

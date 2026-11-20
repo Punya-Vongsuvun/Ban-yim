@@ -6,6 +6,8 @@
   let pickedIcon = '🧸';
   let modalBusy = false;
   let toastTimer = null;
+  let currentTab = 'home';
+  let lastMsgId = '';
 
   function toast(text) {
     const t = $('#toast');
@@ -24,6 +26,17 @@
     $('#homeBody').innerHTML = Screens.home(v);
     $('#screen-challenge').innerHTML = Screens.challenge(v);
     $('#screen-collect').innerHTML = Screens.collect(v);
+    // ข้อความ: ถ้ากำลังเปิดหน้านี้อยู่ ให้ถือว่าอ่านแล้ว และเลื่อนลงล่างสุดเมื่อมีข้อความใหม่
+    const last = v.messages.length ? v.messages[v.messages.length - 1].id : '';
+    $('#msgList').innerHTML = Screens.messages(v);
+    if (currentTab === 'messages') {
+      A.markSeen();
+      if (last !== lastMsgId) window.scrollTo(0, document.body.scrollHeight);
+    }
+    lastMsgId = last;
+    const badge = $('#msgBadge');
+    badge.textContent = v.unread > 9 ? '9+' : String(v.unread);
+    badge.hidden = v.unread === 0 || currentTab === 'messages';
     $('#parentsHead').innerHTML = Screens.parentsHead(v);
     $('#parentsNote').innerHTML = Screens.parentsNote(v);
     $('#houseCard').innerHTML = Screens.houseCard(v);
@@ -44,7 +57,19 @@
       b.classList.toggle('active', on);
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
+    currentTab = name;
     window.scrollTo(0, 0);
+    if (name === 'messages') {
+      A.markSeen();
+      $('#msgBadge').hidden = true;
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+  }
+
+  /* ---------- ข้อความ ---------- */
+  function sendText() {
+    const el = $('#msgText');
+    if (A.sendMessage(el.value)) el.value = '';
   }
 
   /* ---------- กล่องของขวัญ ---------- */
@@ -100,6 +125,8 @@
     if (d.action.charAt(0) === 'w') { Welcome.handle(d.action, el); return; }
     switch (d.action) {
       case 'tab': showTab(d.tab); break;
+      case 'sendMsg': sendText(); break;
+      case 'sendEmoji': A.sendMessage(d.e); break;
       case 'toggleDone': A.toggleDone(d.id); break;
       case 'setLen': A.setLen(Number(d.len)); break;
       case 'openGift': openGift(); break;
@@ -117,12 +144,14 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter') return;
+    if (e.target.id === 'msgText') sendText();
     if (e.target.id === 'missionTitle') addMission();
     if (e.target.id === 'rewardTitle') addReward();
   });
 
   Store.subscribe(render);
   Store.onError(toast);
+  $('#emojiPanel').innerHTML = Screens.emojiPanel();
   Scene.mount($('#scene'));
   render();
 })();
