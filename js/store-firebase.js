@@ -14,10 +14,19 @@ import { firebaseConfig } from './firebase-config.js';
 const ROLES = {
   dad: { name: 'พ่อ', emoji: '👨', color: '#4C9BE8' },
   mom: { name: 'แม่', emoji: '👩', color: '#EF82A8' },
-  kid: { name: 'ลูก', emoji: '🧒', color: '#F5A23B' }
+  kid: { name: 'ลูก', emoji: '🧒', color: '#F5A23B' },
+  kid2: { name: 'ลูกคนที่ 2', emoji: '👧', color: '#9B7FD4' },
+  kid3: { name: 'ลูกคนที่ 3', emoji: '👦', color: '#3FB8AF' }
 };
-const ROLE_IDS = ['dad', 'mom', 'kid'];
-const DEFAULT_NAMES = { dad: 'พ่อเอ', mom: 'แม่ปาล์ม', kid: 'หนูปุ้ม' };
+const ROLE_IDS = ['dad', 'mom', 'kid', 'kid2', 'kid3'];
+const DEFAULT_NAMES = { dad: 'พ่อเอ', mom: 'แม่ปาล์ม', kid: 'หนูปุ้ม', kid2: 'ปลื้ม', kid3: 'ปริม' };
+// บทบาทที่ต้องมีเสมอ / บทบาทเสริม (ต้องทำภารกิจด้วยก็ต่อเมื่อมีคนเลือกบทบาทนั้นแล้ว)
+const CORE_ROLES = ['dad', 'mom', 'kid'];
+const isChild = r => r === 'kid' || r === 'kid2' || r === 'kid3';
+// บทบาทที่ต้องทำภารกิจจึงจะนับดาว: dad, mom, kid เสมอ + kid2/kid3 ถ้ามีคนเลือกแล้ว
+function activeRoles(roles) {
+  return ROLE_IDS.filter(function (r) { return CORE_ROLES.indexOf(r) >= 0 || !!(roles && roles[r]); });
+}
 
 const ANIMALS = [
   { id: 'butterfly', name: 'ผีเสื้อ',  weight: 30, rarity: '' },
@@ -276,6 +285,7 @@ function view() {
     me: me.role,
     names,
     roles: f.roles || {},
+    activeRoles: activeRoles(f.roles),
     stars: f.stars || 0,
     treeStars: f.treeStars || 0,
     treeNumber: f.treeNumber || 1,
@@ -301,9 +311,9 @@ const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slic
 const parentOnly = () => myRole() === 'dad' || myRole() === 'mom';
 
 /* ---------- กติกานับดาว (คืนค่าฟิลด์ของบ้านที่ต้องอัปเดต) ---------- */
-// ภารกิจครบ 3 คน 1 ข้อ = 1 ดาว | 2 ดาว = ต้นไม้โต 1 ขั้น | ทุก 3 ดาว = 1 กล่อง
+// ภารกิจครบทุกคนที่อยู่ในบ้าน (พ่อ แม่ ลูก + ลูกคนที่ 2/3 ถ้ามี) 1 ข้อ = 1 ดาว | 2 ดาว = ต้นไม้โต 1 ขั้น | ทุก 3 ดาว = 1 กล่อง
 // ต้นไม้เต็ม (8 ดาว) แล้วได้ดาวถัดไป: ย้ายลงสวนอัตโนมัติ เริ่มต้นใหม่ (ดาวนั้นเป็นของต้นใหม่)
-// วันท้าทาย: นับวันละ 1 ครั้งเมื่อมีภารกิจครบ 3 คนข้อแรก ครบ challengeLen = +2 กล่อง แล้วเริ่มนับใหม่
+// วันท้าทาย: นับวันละ 1 ครั้งเมื่อมีภารกิจครบทุกคนข้อแรก ครบ challengeLen = +2 กล่อง แล้วเริ่มนับใหม่
 function countStar(f, today) {
   const fu = {};
   const stars = (f.stars || 0) + 1;
@@ -340,8 +350,8 @@ const A = {
       const next = !done[role];
       const up = { ['done.' + missionId + '.' + role]: next, tick: { m: missionId } };
       let fu = null;
-      const all3 = ROLE_IDS.every(function (r) { return r === role ? next : !!done[r]; });
-      if (all3 && !(day.counted && day.counted[missionId])) {
+      const allDone = activeRoles(fs.data().roles).every(function (r) { return r === role ? next : !!done[r]; });
+      if (allDone && !(day.counted && day.counted[missionId])) {
         up['counted.' + missionId] = true;
         fu = countStar(fs.data(), today);
       }
@@ -482,7 +492,7 @@ async function join(code, role) {
 function enter(code) { startFamily(cleanCode(code)); }
 
 window.Store = {
-  ROLES, ROLE_IDS, ANIMALS, STAGE_NAMES, DEFAULT_NAMES, EMOJIS, MSG_MAX,
+  ROLES, ROLE_IDS, isChild, ANIMALS, STAGE_NAMES, DEFAULT_NAMES, EMOJIS, MSG_MAX,
   animal: id => ANIMALS.find(a => a.id === id),
   status: () => status,
   statusMsg: () => statusMsg,

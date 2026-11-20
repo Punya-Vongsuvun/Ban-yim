@@ -9,8 +9,8 @@
     });
   }
 
-  function dots(done) {
-    return Store.ROLE_IDS.map(function (r) {
+  function dots(done, roles) {
+    return roles.map(function (r) {
       return '<span class="dot' + (done[r] ? ' on' : '') + '" style="--c:' + R[r].color + '"></span>';
     }).join('');
   }
@@ -44,21 +44,21 @@
       h += '<div class="card muted center">ยังไม่มีภารกิจวันนี้<br>(พ่อ/แม่เปิดใช้ภารกิจได้ในหน้า "พ่อแม่")</div>';
     }
     v.todayMissions.forEach(function (m) {
-      const all = Store.ROLE_IDS.every(function (r) { return m.done[r]; });
+      const all = v.activeRoles.every(function (r) { return m.done[r]; });
       const mine = !!m.done[v.me];
-      const who = Store.ROLE_IDS.filter(function (r) { return m.done[r]; }).map(function (r) { return R[r].name; });
+      const who = v.activeRoles.filter(function (r) { return m.done[r]; }).map(function (r) { return R[r].name; });
       h += '<button class="mission' + (all ? ' all' : '') + (mine ? ' mine' : '') + '" data-action="toggleDone" data-id="' + m.id +
         '" aria-pressed="' + mine + '" aria-label="' + esc(m.title) + ' ทำแล้ว: ' + (who.join(' ') || 'ยังไม่มี') + '">' +
         '<span class="m-icon">' + m.icon + '</span>' +
         '<span class="m-title">' + esc(m.title) + '</span>' +
-        '<span class="dots">' + dots(m.done) + '</span>' +
+        '<span class="dots">' + dots(m.done, v.activeRoles) + '</span>' +
         (all ? '<span class="m-check">✔</span>' : '') + '</button>';
     });
     h += '</div>';
-    h += '<div class="legend"><span><i class="dot on" style="--c:' + R.dad.color + '"></i> พ่อ</span>' +
-      '<span><i class="dot on" style="--c:' + R.mom.color + '"></i> แม่</span>' +
-      '<span><i class="dot on" style="--c:' + R.kid.color + '"></i> ลูก</span></div>' +
-      '<p class="muted center">แตะแถวภารกิจเพื่อบอกว่า "ฉันทำแล้ว" (ต้องครบ 3 คนถึงจะนับ)</p>';
+    h += '<div class="legend">' + v.activeRoles.map(function (r) {
+      return '<span><i class="dot on" style="--c:' + R[r].color + '"></i> ' + R[r].name + '</span>';
+    }).join('') + '</div>' +
+      '<p class="muted center">แตะแถวภารกิจเพื่อบอกว่า "ฉันทำแล้ว" (ต้องครบ ' + v.activeRoles.length + ' คนถึงจะนับ)</p>';
     return h;
   }
 
@@ -75,7 +75,7 @@
       h += '<span class="cal-dot' + (i <= done ? ' on' : '') + '">' + (i <= done ? '✔' : i) + '</span>';
     }
     h += '</div></div>' +
-      '<div class="card note"><p>📌 วันจะนับเมื่อมีภารกิจที่ครบ 3 คนอย่างน้อย 1 ข้อ</p>' +
+      '<div class="card note"><p>📌 วันจะนับเมื่อมีภารกิจที่ครบทุกคนอย่างน้อย 1 ข้อ</p>' +
       '<p>💔 ถ้าขาดวันไหน ต้องเริ่มนับใหม่</p>' +
       '<p>🎁 ทำครบ ' + len + ' วัน ได้กล่องของขวัญ 2 กล่อง</p></div>';
     return h;
@@ -133,7 +133,7 @@
     return '<span class="hello-emoji">' + R[v.me].emoji + '</span> สวัสดี ' + esc(v.names[v.me] || R[v.me].name);
   }
   function parentsNote(v) {
-    return v.me === 'kid' ? '<div class="card note">👀 ลูกดูหน้านี้ได้อย่างเดียว แก้ไขไม่ได้นะ</div>' : '';
+    return Store.isChild(v.me) ? '<div class="card note">👀 ลูกดูหน้านี้ได้อย่างเดียว แก้ไขไม่ได้นะ</div>' : '';
   }
   function houseCard(v) {
     return '<div class="card house-card"><div class="label">รหัสบ้าน (ให้คนในครอบครัวใส่ตอนเข้าร่วม)</div>' +
@@ -141,7 +141,7 @@
       '<button class="btn wide" data-action="copyCode" data-code="' + esc(v.code) + '">คัดลอกรหัส</button></div>';
   }
   function memberList(v) {
-    const canRelease = v.me !== 'kid';
+    const canRelease = !Store.isChild(v.me);
     return Store.ROLE_IDS.map(function (r) {
       const taken = !!v.roles[r], mine = v.me === r;
       return '<div class="row-item"><span class="m-icon">' + R[r].emoji + '</span>' +
@@ -153,7 +153,7 @@
     }).join('');
   }
   function missionList(v) {
-    const ro = v.me === 'kid';
+    const ro = Store.isChild(v.me);
     return v.missions.map(function (m) {
       return '<div class="row-item">' +
         '<span class="m-icon">' + m.icon + '</span>' +
@@ -163,7 +163,7 @@
     }).join('');
   }
   function rewardList(v) {
-    const ro = v.me === 'kid';
+    const ro = Store.isChild(v.me);
     if (!v.rewards.length) return '<div class="card muted center">ยังไม่มีรางวัลจริง</div>';
     return v.rewards.map(function (r) {
       return '<div class="row-item"><span class="m-icon">🎀</span><span class="m-title">' + esc(r.title) + '</span>' +

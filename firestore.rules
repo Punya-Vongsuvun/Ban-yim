@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // บ้านยิ้ม — Security Rules (เฟส 3: ดาว/ต้นไม้/กล่อง/สตรีค แก้ตรงๆ ไม่ได้ ต้องตรงกติกา)
-// families/{รหัสบ้าน}: members { uid: {role, name} } และ roles { dad|mom|kid: uid }
+// families/{รหัสบ้าน}: members { uid: {role, name} } และ roles { dad|mom|kid|kid2|kid3: uid }
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -25,7 +25,7 @@ service cloud.firestore {
       return signedIn()
         && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
         && !(uid in o.members)
-        && r in ['dad', 'mom', 'kid']
+        && r in ['dad', 'mom', 'kid', 'kid2', 'kid3']
         && !(r in o.roles)
         && d.roles[r] == uid
         && d.roles.diff(o.roles).affectedKeys().hasOnly([r])
@@ -48,7 +48,8 @@ service cloud.firestore {
       return (request.auth.uid in o.members)
         && o.members[request.auth.uid].role in ['dad', 'mom']
         && d.diff(o).affectedKeys().hasOnly(['members', 'roles'])
-        && (releasesRole(o, d, 'dad') || releasesRole(o, d, 'mom') || releasesRole(o, d, 'kid'));
+        && (releasesRole(o, d, 'dad') || releasesRole(o, d, 'mom') || releasesRole(o, d, 'kid')
+            || releasesRole(o, d, 'kid2') || releasesRole(o, d, 'kid3'));
     }
 
     // ---------- เวลาไทย (UTC+7) ----------
@@ -63,7 +64,7 @@ service cloud.firestore {
     function countedBefore(f) { return get(dayPath(f)).data.get('counted', {}); }
     function countedAfter(f) { return getAfter(dayPath(f)).data.get('counted', {}); }
     function newlyCounted(f) { return countedAfter(f).diff(countedBefore(f)).affectedKeys(); }
-    // ในคำขอเดียวกัน เอกสารของวันต้องมีภารกิจที่เพิ่งถูกนับ "ข้อเดียว" (ข้อที่ระบุใน tick.m) และครบ 3 คนจริง
+    // ในคำขอเดียวกัน เอกสารของวันต้องมีภารกิจที่เพิ่งถูกนับ "ข้อเดียว" (ข้อที่ระบุใน tick.m) และครบทุกคนในบ้านจริง
     function oneNewlyCounted(f) {
       let dn = getAfter(dayPath(f)).data;
       let mid = dn.tick.m;
@@ -75,7 +76,10 @@ service cloud.firestore {
         && (mid in dn.missionIds)
         && dn.done[mid].get('dad', false) == true
         && dn.done[mid].get('mom', false) == true
-        && dn.done[mid].get('kid', false) == true;
+        && dn.done[mid].get('kid', false) == true
+        // ลูกคนที่ 2/3: ถ้ามีคนเลือกบทบาทนั้นในบ้านแล้ว ต้องทำด้วย (ยังไม่มีคนเลือกไม่ต้องรอ)
+        && (!('kid2' in famData(f).roles) || dn.done[mid].get('kid2', false) == true)
+        && (!('kid3' in famData(f).roles) || dn.done[mid].get('kid3', false) == true);
     }
 
     function validStage(d) {

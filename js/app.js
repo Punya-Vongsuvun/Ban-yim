@@ -44,7 +44,7 @@
     $('#missionList').innerHTML = Screens.missionList(v);
     $('#rewardList').innerHTML = Screens.rewardList(v);
     $('#iconPicker').innerHTML = Screens.iconPicker(pickedIcon);
-    const ro = v.me === 'kid';
+    const ro = Store.isChild(v.me);
     $('#missionForm').hidden = ro;
     $('#rewardForm').hidden = ro;
   }

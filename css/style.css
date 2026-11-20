@@ -100,7 +100,7 @@ main { padding: 0 14px calc(150px + env(safe-area-inset-bottom)); }
 .dot.on { background: var(--c); }
 .mission .dot.on { transform: scale(1.1); }
 .m-check { position: absolute; top: -8px; right: -4px; background: var(--green); color: #fff; width: 24px; height: 24px; border-radius: 50%; font-size: 14px; display: grid; place-items: center; }
-.legend { display: flex; justify-content: center; gap: 18px; margin-top: 12px; font-size: 14px; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 12px; font-size: 14px; }
 .legend .dot { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
 
 /* ---------- ท้าทาย ---------- */
