@@ -76,9 +76,12 @@
   }
   function staticMarkup() {
     return '<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#FFF1DC"/><stop offset="1" stop-color="#FFF9F0"/></linearGradient></defs>' +
+      '<stop id="skyTop" offset="0" stop-color="#FFF1DC"/><stop id="skyBot" offset="1" stop-color="#FFF9F0"/></linearGradient></defs>' +
       '<rect width="400" height="440" fill="url(#sky)"/>' +
-      '<circle cx="332" cy="74" r="46" fill="#FFE3B0" fill-opacity=".55"/><circle cx="332" cy="74" r="28" fill="#FFD58A"/>' +
+      '<g id="stars" opacity="0">' + starsMarkup() + '</g>' +
+      '<g id="sun"><circle cx="332" cy="74" r="46" fill="#FFE3B0" fill-opacity=".55"/><circle cx="332" cy="74" r="28" fill="#FFD58A"/></g>' +
+      '<g id="moon" opacity="0"><circle cx="332" cy="74" r="44" fill="#FFF6C8" fill-opacity=".18"/><circle cx="332" cy="74" r="28" fill="#FFF3C4"/>' +
+      '<circle cx="322" cy="66" r="5" fill="#EBDDA0"/><circle cx="341" cy="82" r="4" fill="#EBDDA0"/><circle cx="337" cy="63" r="2.5" fill="#EBDDA0"/></g>' +
       '<g id="clouds">' + cloud(0, 54, 1, .95) + cloud(0, 120, .7, .8) + cloud(0, 36, .85, .85) + '</g>' +
       /* ต้นไม้ด้านหลัง */
       '<rect x="56" y="240" width="16" height="100" rx="6" fill="#9B6B47"/>' +
@@ -98,11 +101,40 @@
       '<g id="animalLayer"></g>' +
       '<path d="M0 424 Q110 412 210 422 T400 416 L400 440 L0 440 Z" fill="#7DB563"/>' +
       tuft(20, 430, 1.1) + tuft(80, 426, .9) + tuft(146, 432, 1.2) + tuft(230, 428, 1) + tuft(300, 434, 1.1) + tuft(376, 428, 1) +
-      flower(54, 408, 5) + flower(268, 414, 5) + flower(344, 404, 4.5);
+      flower(54, 408, 5) + flower(268, 414, 5) + flower(344, 404, 4.5) +
+      '<rect id="nightTint" width="400" height="440" fill="#2B3A78" opacity="0" pointer-events="none"/>';
+  }
+
+  /* ---------- กลางวัน/กลางคืนตามเวลาประเทศไทย (06:00–17:59 = กลางวัน) ---------- */
+  const STARS = [[30,30,1.6],[62,86,1.2],[96,24,1.4],[128,62,1.8],[160,18,1.2],[196,50,1.6],[226,92,1.2],[250,30,1.8],
+    [284,66,1.2],[300,20,1.4],[372,40,1.2],[384,110,1.4],[14,120,1.2],[110,112,1.4],[176,118,1.2],[262,126,1.4],[350,140,1.2],[48,160,1.4]];
+  function starsMarkup() {
+    return STARS.map(function (p, i) {
+      return '<circle class="star" cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '" fill="#FFFBE0" data-i="' + i + '"/>';
+    }).join('');
+  }
+  function thaiHour() {
+    try {
+      return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+    } catch (e) { return (new Date().getUTCHours() + 7) % 24; }
+  }
+  let isNight = false;
+  function applyDayNight() {
+    if (!svg) return;
+    const h = thaiHour();
+    isNight = h < 6 || h >= 18;
+    const q = function (id) { return svg.querySelector(id); };
+    q('#skyTop').setAttribute('stop-color', isNight ? '#0F1B4A' : '#FFF1DC');
+    q('#skyBot').setAttribute('stop-color', isNight ? '#3B4F8F' : '#FFF9F0');
+    q('#sun').setAttribute('opacity', isNight ? 0 : 1);
+    q('#moon').setAttribute('opacity', isNight ? 1 : 0);
+    q('#stars').setAttribute('opacity', isNight ? 1 : 0);
+    q('#nightTint').setAttribute('opacity', isNight ? .26 : 0);
+    clouds.forEach(function (c) { c.style.opacity = isNight ? .35 : ''; });
   }
 
   /* ---------- ควบคุมฉาก ---------- */
-  let svg, sway, inner, layer, clouds, curStage = -1, started = false, staticDrawn = false;
+  let svg, sway, inner, layer, clouds, stars = [], curStage = -1, started = false, staticDrawn = false;
   // สัตว์ในฉาก: แสดงพร้อมกันได้ SCENE_MAX ตัว (นับทุกชนิดรวมกัน ตัวซ้ำชนิดเดียวกันนับเป็นคนละตัว)
   // ถ้าสะสมได้มากกว่านั้น ทุก ROTATE_SEC วินาทีจะเปลี่ยน 1 ตัว (ตัวที่อยู่นานสุดจางหายไป ตัวถัดไปจากคิวสุ่มจางเข้ามา)
   // คิวสุ่มรับประกันว่าทุกตัวได้ออกมาครบก่อนเริ่มรอบใหม่
@@ -160,7 +192,9 @@
     clouds = Array.prototype.slice.call(svg.querySelectorAll('.cloud'));
     clouds.forEach(function (c, i) { c._x0 = i * 170 + 40; c._sp = 5 + i * 2.5; });
     inner.setAttribute('transform', 'translate(' + BASE.x + ' ' + BASE.y + ')');
-    if (!started) { started = true; requestAnimationFrame(frame); }
+    stars = Array.prototype.slice.call(svg.querySelectorAll('.star'));
+    applyDayNight();
+    if (!started) { started = true; requestAnimationFrame(frame); setInterval(applyDayNight, 60000); }
   }
 
   function setTree(stage) {
@@ -233,6 +267,9 @@
     const amp = .5 + Math.max(0, curStage) * .28;
     const ang = move ? (Math.sin(t * .9) * 1.1 + Math.sin(t * 1.7 + 1) * .5) * amp : 0;
     sway.setAttribute('transform', 'rotate(' + ang.toFixed(2) + ' ' + BASE.x + ' ' + BASE.y + ')');
+    if (isNight) stars.forEach(function (st, i) {
+      st.setAttribute('opacity', (move ? .55 + .45 * Math.sin(t * 2.2 + i * 1.7) : 1).toFixed(2));
+    });
     clouds.forEach(function (c) {
       const x = ((c._x0 + c._sp * t) % 560) - 80;
       c.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + c.getAttribute('data-y') + ') scale(' + c.getAttribute('data-s') + ')');

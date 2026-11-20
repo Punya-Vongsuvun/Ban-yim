@@ -15,8 +15,8 @@ const ROLES = {
   dad: { name: 'พ่อ', emoji: '👨', color: '#4C9BE8' },
   mom: { name: 'แม่', emoji: '👩', color: '#EF82A8' },
   kid: { name: 'ลูก', emoji: '🧒', color: '#F5A23B' },
-  kid2: { name: 'ลูกคนที่ 2', emoji: '👧', color: '#9B7FD4' },
-  kid3: { name: 'ลูกคนที่ 3', emoji: '👦', color: '#3FB8AF' }
+  kid2: { name: 'ลูกคนที่ 2', emoji: '👦', color: '#9B7FD4' },
+  kid3: { name: 'ลูกคนที่ 3', emoji: '👧', color: '#3FB8AF' }
 };
 const ROLE_IDS = ['dad', 'mom', 'kid', 'kid2', 'kid3'];
 const DEFAULT_NAMES = { dad: 'พ่อเอ', mom: 'แม่ปาล์ม', kid: 'หนูปุ้ม', kid2: 'ปลื้ม', kid3: 'ปริม' };
