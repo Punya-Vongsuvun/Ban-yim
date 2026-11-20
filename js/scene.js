@@ -97,6 +97,7 @@
       '<ellipse cx="200" cy="345" rx="68" ry="16" fill="#946040"/>' +
       '<ellipse cx="178" cy="343" rx="14" ry="4" fill="#A66F48"/><ellipse cx="226" cy="347" rx="10" ry="3" fill="#7F5133"/>' +
       '<g id="treeSway"><g id="treeInner"></g></g>' +
+      '<g id="leafFall"></g>' +
       '<path d="M0 392 Q120 376 220 388 T400 382 L400 440 L0 440 Z" fill="#8FC174"/>' +
       '<g id="animalLayer"></g>' +
       '<path d="M0 424 Q110 412 210 422 T400 416 L400 440 L0 440 Z" fill="#7DB563"/>' +
@@ -134,7 +135,7 @@
   }
 
   /* ---------- ควบคุมฉาก ---------- */
-  let svg, sway, inner, layer, clouds, stars = [], swayers = [], curStage = -1, started = false, staticDrawn = false;
+  let svg, sway, inner, layer, clouds, stars = [], fallers = [], swayers = [], curStage = -1, started = false, staticDrawn = false;
   // สัตว์ในฉาก: แสดงพร้อมกันได้ SCENE_MAX ตัว (นับทุกชนิดรวมกัน ตัวซ้ำชนิดเดียวกันนับเป็นคนละตัว)
   // ถ้าสะสมได้มากกว่านั้น ทุก ROTATE_SEC วินาทีจะเปลี่ยน 1 ตัว (ตัวที่อยู่นานสุดจางหายไป ตัวถัดไปจากคิวสุ่มจางเข้ามา)
   // คิวสุ่มรับประกันว่าทุกตัวได้ออกมาครบก่อนเริ่มรอบใหม่
@@ -192,6 +193,14 @@
     clouds = Array.prototype.slice.call(svg.querySelectorAll('.cloud'));
     clouds.forEach(function (c, i) { c._x0 = i * 170 + 40; c._sp = 5 + i * 2.5; });
     inner.setAttribute('transform', 'translate(' + BASE.x + ' ' + BASE.y + ')');
+    const lf = svg.querySelector('#leafFall'), tones = ['#8CCB5E', '#A8D86E', '#C9D96B', '#F2B45A', '#E88F5A'];
+    fallers = [];
+    for (let i = 0; i < 7; i++) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.innerHTML = leaf(0, 0, 0, 7 + (i % 3) * 2, tones[i % tones.length]);
+      lf.appendChild(g);
+      fallers.push({ g, t0: -i * 1.7, dur: 7 + (i % 4), x0: 0, ph: i * 2.1, k: 0 });
+    }
     stars = Array.prototype.slice.call(svg.querySelectorAll('.star'));
     swayers = Array.prototype.slice.call(svg.querySelectorAll('.sw')).filter(function (g) { return !inner.contains(g); });
     swayers.forEach(function (g, i) { g._base = g.getAttribute('transform'); g._ph = i * 1.3; g._tuft = g.classList.contains('tf'); });
@@ -269,6 +278,18 @@
     const amp = .9 + Math.max(0, curStage) * .5;
     const gust = .75 + .25 * Math.sin(t * .6);                       // ลมแรงขึ้น-เบาลงเป็นช่วงๆ
     const ang = move ? (Math.sin(t * 1.8) * 1.5 + Math.sin(t * 3.1 + 1) * .8) * amp * gust : 0;
+    // ใบไม้ร่วง: เริ่มจากพุ่มใบตามขนาดต้นไม้ แล้วลอยลงพื้น (ต้นยังไม่มีพุ่มใบจะไม่มีใบร่วง)
+    const top = [0, 0, 0, 170, 215][Math.max(0, Math.min(4, curStage))], spread = [0, 0, 0, 55, 70][Math.max(0, Math.min(4, curStage))];
+    fallers.forEach(function (f) {
+      if (!move || !top) { f.g.setAttribute('opacity', 0); return; }
+      let p = (t - f.t0) / f.dur, n = Math.floor(p);
+      p -= n;
+      if (n !== f.k) { f.k = n; f.x0 = (Math.random() * 2 - 1) * spread; }
+      const y = BASE.y - top + p * (top + 30);
+      const x = BASE.x + f.x0 + Math.sin(t * 1.6 + f.ph) * 22 + p * 24 * gust;
+      f.g.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + (Math.sin(t * 2 + f.ph) * 50 + p * 200).toFixed(0) + ')');
+      f.g.setAttribute('opacity', (Math.min(1, p * 8, (1 - p) * 5) * .95).toFixed(2));
+    });
     swayers.forEach(function (g) {
       const a = move ? (Math.sin(t * 2.6 + g._ph) * 7 + Math.sin(t * 4.3 + g._ph * 2) * 3) * gust : 0;
       g.setAttribute('transform', g._base + ' rotate(' + a.toFixed(2) + (g._tuft ? '' : ' 0 9') + ')');
