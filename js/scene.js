@@ -103,7 +103,53 @@
 
   /* ---------- ควบคุมฉาก ---------- */
   let svg, sway, inner, layer, clouds, curStage = -1, started = false, staticDrawn = false;
-  const actors = {};               // type -> [actor]
+  // สัตว์ในฉาก: แสดงพร้อมกันได้ SCENE_MAX ตัว (นับทุกชนิดรวมกัน ตัวซ้ำชนิดเดียวกันนับเป็นคนละตัว)
+  // ถ้าสะสมได้มากกว่านั้น ทุก ROTATE_SEC วินาทีจะเปลี่ยน 1 ตัว (ตัวที่อยู่นานสุดจางหายไป ตัวถัดไปจากคิวสุ่มจางเข้ามา)
+  // คิวสุ่มรับประกันว่าทุกตัวได้ออกมาครบก่อนเริ่มรอบใหม่
+  const SCENE_MAX = 3, ROTATE_SEC = 8, FADE_SEC = 1;
+  let visible = [];                // ตัวที่อยู่ในฉาก: { key, slot, act, born }
+  let leaving = [];                // ตัวที่กำลังจางหาย: { ..., outAt }
+  let bag = [];                    // คิวของรอบนี้ (key ที่ยังไม่ได้ออก)
+  let poolList = [];               // ทุกตัวที่สะสมได้: key = 'รหัสสัตว์#ลำดับ'
+  let nextRotate = null, nowT = 0;
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function takeNext() {
+    if (!bag.length) {
+      const shown = visible.map(function (e) { return e.key; });
+      bag = shuffle(poolList.filter(function (k) { return shown.indexOf(k) < 0; }));
+    }
+    return bag.shift();
+  }
+  function show(key, fade) {
+    const used = visible.concat(leaving).map(function (e) { return e.slot; });
+    let slot = 0;
+    while (used.indexOf(slot) >= 0 && slot < SCENE_MAX + 1) slot++;
+    if (slot > SCENE_MAX) {                              // ช่องเต็มจริงๆ (ไม่ควรเกิด): ใช้ช่องที่ไม่ซ้ำกับตัวที่อยู่ในฉาก
+      slot = 0;
+      while (visible.some(function (e) { return e.slot === slot; })) slot++;
+    }
+    const act = Animals.create(key.split('#')[0], slot);
+    act.g.setAttribute('opacity', fade ? 0 : 1);
+    layer.appendChild(act.g);
+    visible.push({ key, slot, act, born: fade ? nowT : -Infinity });
+  }
+  function rotate() {
+    if (poolList.length <= SCENE_MAX || visible.length < SCENE_MAX) return;
+    const key = takeNext();                              // หยิบก่อน เพื่อไม่ให้ตัวที่กำลังออกถูกหยิบกลับทันที
+    if (!key) return;
+    const out = visible.shift();
+    if (reduce.matches) layer.removeChild(out.act.g);
+    else { out.outAt = nowT; leaving.push(out); }
+    show(key, !reduce.matches);
+    staticDrawn = false;
+  }
 
   function mount(el) {
     svg = el;
@@ -129,16 +175,30 @@
   }
 
   function setAnimals(collection) {
+    poolList = [];
     Store.ANIMALS.forEach(function (a) {
-      const want = Math.min(collection[a.id] || 0, a.id === 'bird' ? 1 : 3);
-      const list = actors[a.id] || (actors[a.id] = []);
-      while (list.length < want) {
-        const act = Animals.create(a.id, list.length);
-        layer.appendChild(act.g);
-        list.push(act);
-      }
-      while (list.length > want) layer.removeChild(list.pop().g);
+      for (let k = 0; k < (collection[a.id] || 0); k++) poolList.push(a.id + '#' + k);
     });
+    const inPool = {};
+    poolList.forEach(function (k) { inPool[k] = true; });
+    visible = visible.filter(function (e) {
+      if (inPool[e.key]) return true;
+      layer.removeChild(e.act.g);
+      return false;
+    });
+    bag = bag.filter(function (k) { return inPool[k]; });
+    // ตัวใหม่ที่เพิ่งได้: แทรกในคิวที่ตำแหน่งสุ่ม
+    const known = {};
+    visible.concat(leaving).forEach(function (e) { known[e.key] = true; });
+    bag.forEach(function (k) { known[k] = true; });
+    poolList.forEach(function (k) {
+      if (!known[k]) bag.splice(Math.floor(Math.random() * (bag.length + 1)), 0, k);
+    });
+    while (visible.length < SCENE_MAX) {
+      const key = takeNext();
+      if (!key) break;
+      show(key, false);
+    }
   }
 
   function update(v) {
@@ -155,6 +215,9 @@
     const t = ts / 1000;
     const dt = Math.min(.05, Math.max(0, t - last));
     last = t;
+    nowT = t;
+    if (nextRotate === null) nextRotate = t + ROTATE_SEC;
+    if (t >= nextRotate) { nextRotate = t + ROTATE_SEC; rotate(); }
 
     if (reduce.matches) {
       if (staticDrawn) return;
@@ -174,8 +237,16 @@
       const x = ((c._x0 + c._sp * t) % 560) - 80;
       c.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + c.getAttribute('data-y') + ') scale(' + c.getAttribute('data-s') + ')');
     });
-    Object.keys(actors).forEach(function (k) {
-      actors[k].forEach(function (a) { a.update(t, dt); });
+    visible.forEach(function (e) {
+      e.act.update(t, dt);
+      e.act.g.setAttribute('opacity', move ? Math.max(0, Math.min(1, (t - e.born) / FADE_SEC)).toFixed(2) : 1);
+    });
+    leaving = leaving.filter(function (e) {
+      const o = 1 - (t - e.outAt) / FADE_SEC;
+      if (!move || o <= 0) { layer.removeChild(e.act.g); return false; }
+      e.act.update(t, dt);
+      e.act.g.setAttribute('opacity', o.toFixed(2));
+      return true;
     });
   }
 

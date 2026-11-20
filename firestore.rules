@@ -129,11 +129,12 @@ service cloud.firestore {
         && d.gifts == o.gifts - 1
         && (ks.size() == 0
             || (ks.size() == 1
-                && ks.hasOnly(['butterfly', 'ladybug', 'bee', 'dragonfly', 'snail', 'firefly', 'bird'])
-                && inc(o, d, 'butterfly') in [0, 1] && inc(o, d, 'ladybug') in [0, 1]
-                && inc(o, d, 'bee') in [0, 1] && inc(o, d, 'dragonfly') in [0, 1]
-                && inc(o, d, 'snail') in [0, 1] && inc(o, d, 'firefly') in [0, 1]
-                && inc(o, d, 'bird') in [0, 1]));
+                && ks.hasOnly(['butterfly', 'ladybug', 'bee', 'dragonfly', 'snail', 'firefly', 'bird', 'ant', 'cricket', 'grasshopper', 'caterpillar', 'frog', 'chick', 'goldfish', 'turtle', 'rabbit', 'squirrel', 'hedgehog', 'owl', 'deer'])
+                && inc(o, d, 'butterfly') in [0, 1] && inc(o, d, 'ladybug') in [0, 1] && inc(o, d, 'bee') in [0, 1] && inc(o, d, 'dragonfly') in [0, 1]
+                && inc(o, d, 'snail') in [0, 1] && inc(o, d, 'firefly') in [0, 1] && inc(o, d, 'bird') in [0, 1] && inc(o, d, 'ant') in [0, 1]
+                && inc(o, d, 'cricket') in [0, 1] && inc(o, d, 'grasshopper') in [0, 1] && inc(o, d, 'caterpillar') in [0, 1] && inc(o, d, 'frog') in [0, 1]
+                && inc(o, d, 'chick') in [0, 1] && inc(o, d, 'goldfish') in [0, 1] && inc(o, d, 'turtle') in [0, 1] && inc(o, d, 'rabbit') in [0, 1]
+                && inc(o, d, 'squirrel') in [0, 1] && inc(o, d, 'hedgehog') in [0, 1] && inc(o, d, 'owl') in [0, 1] && inc(o, d, 'deer') in [0, 1]));
     }
 
     // ของสุ่มพิเศษ: วันโชคดี (วันละครั้ง) บ้านได้กล่อง +1 โดยไม่ต้องทำภารกิจ

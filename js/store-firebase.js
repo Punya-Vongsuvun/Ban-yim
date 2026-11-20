@@ -35,7 +35,21 @@ const ANIMALS = [
   { id: 'dragonfly', name: 'แมลงปอ',   weight: 14, rarity: '' },
   { id: 'snail',     name: 'หอยทาก',   weight: 8,  rarity: '' },
   { id: 'firefly',   name: 'หิ่งห้อย', weight: 6,  rarity: 'หายาก' },
-  { id: 'bird',      name: 'นก',       weight: 2,  rarity: 'หายากมาก' }
+  { id: 'bird',      name: 'นก',       weight: 2,  rarity: 'หายากมาก' },
+  // ขั้น C: สัตว์เพิ่ม 13 ชนิด (รหัสต้องตรงกับ isOpeningGift ใน firestore.rules)
+  { id: 'ant',         name: 'มด',        weight: 18, rarity: '' },
+  { id: 'cricket',     name: 'จิ้งหรีด',   weight: 16, rarity: '' },
+  { id: 'grasshopper', name: 'ตั๊กแตน',    weight: 14, rarity: '' },
+  { id: 'caterpillar', name: 'หนอนผีเสื้อ', weight: 12, rarity: '' },
+  { id: 'frog',        name: 'กบ',        weight: 11, rarity: '' },
+  { id: 'chick',       name: 'ลูกเจี๊ยบ',   weight: 10, rarity: '' },
+  { id: 'goldfish',    name: 'ปลาทอง',    weight: 8,  rarity: 'ไม่ค่อยเจอ' },
+  { id: 'turtle',      name: 'เต่า',       weight: 7,  rarity: 'ไม่ค่อยเจอ' },
+  { id: 'rabbit',      name: 'กระต่าย',    weight: 6,  rarity: 'ไม่ค่อยเจอ' },
+  { id: 'squirrel',    name: 'กระรอก',    weight: 5,  rarity: 'ไม่ค่อยเจอ' },
+  { id: 'hedgehog',    name: 'เม่น',       weight: 4,  rarity: 'ไม่ค่อยเจอ' },
+  { id: 'owl',         name: 'นกฮูก',     weight: 3,  rarity: 'หายาก' },
+  { id: 'deer',        name: 'กวางน้อย',   weight: 1.5, rarity: 'หายากมาก' }
 ];
 // วันโชคดี: โอกาสได้กล่องฟรี 1 กล่อง/วัน = LUCKY_HEX3 / 4096 (205 ≈ 5%)
 // ต้องตรงกับเกณฑ์ '0cd' (= 205) ใน firestore.rules (ฟังก์ชัน isLucky) ถ้าแก้ต้องแก้ทั้งสองที่แล้ววาง Rules ใหม่
